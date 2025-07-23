@@ -1,9 +1,13 @@
 import express from 'express';
 import path from "path";
 import { authenticateToken } from './middleware/auth';
-import action from './routes/action_routes';
+
 import auth from './routes/auth_routes';
-import followup from './routes/follow_up_reason_routes';
+
+import action from './routes/action_routes';
+import clearing_house from './routes/clearing_house_routes';
+import ehr_system from './routes/ehr_system_routes';
+import follow_up from './routes/follow_up_reason_routes';
 import pm_system from './routes/pm_system_routes';
 import status from './routes/status_routes';
 import users from './routes/user_routes';
@@ -22,7 +26,9 @@ app.use(authenticateToken);
 app.use(auth)
 
 app.use('/api/actions/', action);
-app.use('/api/followup/', followup);
+app.use('/api/clearing_houses/', clearing_house);
+app.use('/api/ehr_systems/', ehr_system);
+app.use('/api/follow_ups/', follow_up);
 app.use('/api/pm_systems/', pm_system);
 app.use('/api/statuses/', status);
 app.use('/api/users/', users);
