@@ -1,8 +1,6 @@
 import express from 'express';
-import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { pool } from '../utils/db';
-import { authenticateToken } from '../middleware/auth';
+import { loginUser } from '../services/users';
 
 const router = express.Router();
 
@@ -10,15 +8,12 @@ router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
     try {
-        const [rows]: any = await pool.query('SELECT * FROM users WHERE email = ?', [email]);
-        const user = rows[0];
+        const user = await loginUser({ email, password });
 
-        if (!user || !(await bcrypt.compare(password, user.password))) {
-            return res.status(401).json({ message: 'Invalid credentials' });
-        }
+        if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-        const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, { expiresIn: '15m' });
-        const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET!, { expiresIn: '7d' });
+        const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, { expiresIn: '1h' });
+        const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET!, { expiresIn: '30d' });
 
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
@@ -53,10 +48,6 @@ router.post('/logout', (req, res) => {
         sameSite: 'strict',
     });
     res.sendStatus(200);
-});
-
-router.get('/', authenticateToken, async (req, res) => {
-    res.json({ message: `Hello ${(req as any).user.email}, welcome to your authenticated route!` });
 });
 
 export default router;
