@@ -11,6 +11,10 @@ import follow_up from './routes/follow_up_reason_routes';
 import pm_system from './routes/pm_system_routes';
 import status from './routes/status_routes';
 import users from './routes/user_routes';
+import notes from './routes/note_routes';
+import providers from './routes/provider_routes';
+import practices from './routes/practice_routes';
+import search from './routes/search_routes';
 
 import dotenv from 'dotenv';
 dotenv.config();
@@ -32,6 +36,10 @@ app.use('/api/follow_ups/', follow_up);
 app.use('/api/pm_systems/', pm_system);
 app.use('/api/statuses/', status);
 app.use('/api/users/', users);
+app.use('/api/notes/', notes);
+app.use('/api/providers/', providers);
+app.use('/api/practices/', practices);
+app.use('/api/search/', search);
 
 // Fallback to index.html for SPA routes
 app.get("*", (_req, res) => {

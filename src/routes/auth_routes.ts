@@ -12,8 +12,8 @@ router.post('/login', async (req, res) => {
 
         if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-        const accessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, { expiresIn: '1h' });
-        const refreshToken = jwt.sign({ id: user.id }, process.env.JWT_REFRESH_SECRET!, { expiresIn: '30d' });
+        const accessToken = jwt.sign(user, process.env.JWT_SECRET!, { expiresIn: '1h' });
+        const refreshToken = jwt.sign(user, process.env.JWT_REFRESH_SECRET!, { expiresIn: '30d' });
 
         res.cookie('refreshToken', refreshToken, {
             httpOnly: true,
@@ -36,7 +36,7 @@ router.post('/refresh-token', (req, res) => {
     jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!, (err: any, user: any) => {
         if (err) return res.sendStatus(403);
 
-        const newAccessToken = jwt.sign({ id: user.id }, process.env.JWT_SECRET!, { expiresIn: '15m' });
+        const newAccessToken = jwt.sign(user, process.env.JWT_SECRET!, { expiresIn: '15m' });
         res.json({ accessToken: newAccessToken });
     });
 });
