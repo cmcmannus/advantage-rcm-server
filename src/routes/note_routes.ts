@@ -4,46 +4,44 @@ import {
     deleteNote,
     getNotes,
     updateNote,
-} from '../services/notes';
-import { Note } from '../../../shared/dist';
+    InsertModel,
+    SelectModel
+} from '../services/notes.js';
 
 const router = express.Router();
 
-router.post('/create', async (req, res) => {
-    const { practice_id, provider_id, user_id, timestamp, note } = req.body;
+router.post('/', async (req, res) => {
+    const payload = req.body as InsertModel;
+    if (!payload) return res.status(400).send();
+    const { practiceId, providerId, userId, timestamp, note } = payload;
 
-    if (!user_id || !timestamp || !note)
+    if (!userId || !timestamp || !note || (!practiceId && !providerId))
         return res.status(400).json({ message: 'Missing required fields' });
 
     try {
-        await createNote({
-            practice_id,
-            provider_id,
-            user_id,
-            timestamp,
-            note,
-        });
-        res.status(201).json({ message: 'Note created successfully' });
+        const insertedNote = await createNote(payload);
+        res.status(201).json(insertedNote);
     } catch (err) {
         res.status(500).json({ message: 'Note creation failed' });
     }
 });
 
-router.post('/update', async (req, res) => {
-    const { note_id, note } = req.body;
+router.put('/:id', async (req, res) => {
+    const { note } = req.body;
+    const { id } = req.params;
 
-    if (!note_id || !note)
+    if (!id || !note)
         return res.status(400).json({ message: 'Missing required fields' });
 
     try {
-        await updateNote(note_id, note);
-        res.status(200).json({ message: 'Note updated successfully' });
+        const updatedNote = await updateNote(Number(id), note);
+        res.status(200).json(updatedNote);
     } catch (err) {
         res.status(500).json({ message: 'Note update failed' });
     }
 });
 
-router.get('/delete/:id', async (req, res) => {
+router.delete('/:id', async (req, res) => {
     const { id } = req.params;
 
     if (!id || isNaN(Number(id)))
@@ -51,22 +49,28 @@ router.get('/delete/:id', async (req, res) => {
 
     try {
         await deleteNote(parseInt(id));
-        res.status(200).json({ message: 'Note deleted successfully' });
+        res.send({ message: 'Note deleted successfully' });
     } catch (err) {
         res.status(500).json({ message: 'Note deletion failed' });
     }
 });
 
-router.get('/search', async (req, res) => {
-    const practice_id = req.query.practice_id
-        ? Number(req.query.practice_id)
+router.get('/', async (req, res) => {
+    const practiceId = req.query.practiceId
+        ? Number(req.query.practiceId)
         : undefined;
-    const provider_id = req.query.provider_id
-        ? Number(req.query.provider_id)
+    const providerId = req.query.providerId
+        ? Number(req.query.providerId)
         : undefined;
 
+    if (!practiceId && !providerId) {
+        return res.status(400).json({
+            error: 'At least one of practice_id or provider_id must be provided',
+        });
+    }
+
     try {
-        const notes: Note[] = await getNotes({ practice_id, provider_id });
+        const notes: SelectModel[] = await getNotes({ practiceId, providerId });
         res.json(notes);
     } catch (err) {
         res.status(500).json({

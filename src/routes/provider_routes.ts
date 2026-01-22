@@ -3,19 +3,24 @@ import {
     createProvider,
     updateProvider,
     deleteProvider,
-    getProviders,
-    getProvidersByPracticeId
-} from '../services/providers';
-import { Provider } from '../../../shared/dist';
+    getProviderPractices,
+    search,
+    getProvider,
+    InsertModel,
+    SelectModel,
+    SearchParams,
+    ProviderPracticesSearchParams
+} from '../services/providers.js';
+import { exportFunc } from '../services/export.js';
 
 const router = Router();
 
 // Create a provider
 router.post('/', async (req, res, next) => {
     try {
-        const payload: Omit<Provider, 'id'> = req.body;
-        await createProvider(payload);
-        res.status(201).send({ message: 'Provider created successfully.' });
+        const payload: InsertModel = req.body;
+        const createdProvider = await createProvider(payload);
+        res.status(201).send(createdProvider);
     } catch (err) {
         next(err);
     }
@@ -24,9 +29,21 @@ router.post('/', async (req, res, next) => {
 // Update a provider
 router.put('/:id', async (req, res, next) => {
     try {
-        const provider: Provider = { ...req.body, id: Number(req.params.id) };
-        await updateProvider(provider);
-        res.send({ message: 'Provider updated successfully.' });
+        const provider: SelectModel = { ...req.body, id: Number(req.params.id) };
+        const updatedProvider = await updateProvider(provider);
+        res.send(updatedProvider);
+    } catch (err) {
+        next(err);
+    }
+});
+
+router.get('/export', async (req, res, next) => {
+    try {
+        // Export logic would go here
+        const csv = await exportFunc(req.query as unknown as any);
+        res.header('Content-Type', 'text/csv');
+        res.attachment('providers.csv');
+        res.send(csv);
     } catch (err) {
         next(err);
     }
@@ -45,23 +62,36 @@ router.delete('/:id', async (req, res, next) => {
 // Get providers with optional filters
 router.get('/', async (req, res, next) => {
     try {
-        const { provider_id, limit, offset } = req.query;
-        const providers = await getProviders({
-            provider_id: provider_id ? Number(provider_id) : undefined,
-            limit: limit ? Number(limit) : undefined,
-            offset: offset ? Number(offset) : undefined,
-        });
-        res.send(providers);
+        const results = await search(req.query as unknown as SearchParams)
+        res.send(results);
     } catch (err) {
         next(err);
     }
 });
 
-// Get providers by practice ID
-router.get('/by-practice/:practice_id', async (req, res, next) => {
+// Get practices by provider ID
+router.get('/:id/practices', async (req, res, next) => {
     try {
-        const providers = await getProvidersByPracticeId(Number(req.params.practice_id));
-        res.send(providers);
+        const { id } = req.params;
+        const queryParams = { ...req.query, providerId: Number(id) } as ProviderPracticesSearchParams;
+        const practices = await getProviderPractices(queryParams);
+        if (practices.data.length === 0) {
+            return res.status(200).send({ error: 'Provider is not associated with any practices.' });
+        }
+        res.send(practices);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Get provider by ID
+router.get('/:id', async (req, res, next) => {
+    try {
+        const provider = await getProvider(Number(req.params.id));
+        if (!provider) {
+            return res.status(404).send({ error: 'Provider not found.' });
+        }
+        res.send(provider);
     } catch (err) {
         next(err);
     }

@@ -1,9 +1,5 @@
-import { EhrSystem } from "../../../shared/dist";
-import { createCrudService } from "./create_crud_service";
+import { InferSelectModel } from "drizzle-orm";
+import { createCrudService } from "./create_crud_service.js";
+import { ehrSystems } from "../db/schema.js";
 
-export const ehrSystemService = createCrudService<EhrSystem>({
-    createProc: "create_ehr_system",
-    updateProc: "update_ehr_system",
-    deleteProc: "delete_ehr_system",
-    getAllProc: "get_ehr_systems",
-});
+export const ehrSystemService = createCrudService<InferSelectModel<typeof ehrSystems>>(ehrSystems);

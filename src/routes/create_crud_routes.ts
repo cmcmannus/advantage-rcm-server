@@ -1,6 +1,10 @@
 // routes/create_crud_routes.ts
 import express from "express";
 
+function capitalizeFirstLetter(string: string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
 export function createCrudRoutes<T>(
     service: {
         create: (arg: any) => Promise<T>;
@@ -23,8 +27,9 @@ export function createCrudRoutes<T>(
 
     router.post("/", async (req, res) => {
         try {
-            const item = await service.create(req.body[resourceName]);
-            res.status(201).json(item);
+            if ((req as any).user.accessLevel !== 1) return res.status(401);
+            const item = await service.create(req.body.name);
+            res.status(200).json(item);
         } catch (err) {
             res.status(500).json({ error: `Failed to create ${resourceName}`, details: (err as Error).message });
         }
@@ -32,7 +37,8 @@ export function createCrudRoutes<T>(
 
     router.put("/:id", async (req, res) => {
         try {
-            const item = await service.update(Number(req.params.id), req.body[resourceName]);
+            if ((req as any).user.accessLevel !== 1) return res.status(401);
+            const item = await service.update(Number(req.params.id), req.body.name);
             res.json(item);
         } catch (err) {
             res.status(500).json({ error: `Failed to update ${resourceName}`, details: (err as Error).message });
@@ -41,8 +47,9 @@ export function createCrudRoutes<T>(
 
     router.delete("/:id", async (req, res) => {
         try {
+            if ((req as any).user.accessLevel !== 1) return res.status(401);
             await service.delete(Number(req.params.id));
-            res.status(204).send();
+            res.send({ message: `${capitalizeFirstLetter(resourceName)} deleted successfully` });
         } catch (err) {
             res.status(500).json({ error: `Failed to delete ${resourceName}`, details: (err as Error).message });
         }

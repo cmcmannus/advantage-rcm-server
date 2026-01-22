@@ -1,5 +1,7 @@
-import { createCrudRoutes } from "./create_crud_routes";
-import { clearingHouseService } from "../services/clearing_houses";
+import { createCrudRoutes } from "./create_crud_routes.js";
+import { clearingHouseService } from "../services/clearing_houses.js";
+import { InferSelectModel } from "drizzle-orm";
+import { clearingHouses } from "../db/schema.js";
 
-const router = createCrudRoutes(clearingHouseService, "clearing house");
+const router = createCrudRoutes<InferSelectModel<typeof clearingHouses>>(clearingHouseService, "clearing house");
 export default router;

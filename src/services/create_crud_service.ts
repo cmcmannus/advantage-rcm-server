@@ -1,39 +1,79 @@
 // services/create_crud_service.ts
-import { pool, extractSingleResult, extractList } from "../utils/db";
+import { initDb } from "../db/client.js";
+import { eq, getTableColumns, sql } from 'drizzle-orm';
+import { actions, clearingHouses, ehrSystems, followUpReasons, pmSystems, statuses } from '../db/schema.js';
 
-interface CrudProcedureConfig {
-    createProc: string;
-    updateProc: string;
-    deleteProc: string;
-    getAllProc: string;
-}
+const db = initDb();
 
-export function createCrudService<T>(
-    config: CrudProcedureConfig
+type Tables = typeof actions | 
+    typeof clearingHouses | 
+    typeof ehrSystems | 
+    typeof followUpReasons | 
+    typeof pmSystems | 
+    typeof statuses;
+
+type AllowedTypes = {
+    id: number;
+    action: string;
+} | {
+    id: number;
+    clearingHouseName: string;
+} | {
+    id: number;
+    systemName: string;
+} | {
+    id: number;
+    reason: string;
+} | {
+    id: number;
+    pmSystem: string;
+} | {
+    id: number;
+    status: string
+};
+
+export function createCrudService<T extends AllowedTypes>(
+    table: Tables
 ): {
-    create: (arg: any) => Promise<T>;
-    update: (id: number, arg: any) => Promise<T>;
+    create: (arg: string) => Promise<T>;
+    update: (id: number, arg: string) => Promise<T>;
     delete: (id: number) => Promise<void>;
     getAll: () => Promise<T[]>;
 } {
+    const { id, ...columns } = getTableColumns(table);
+    const columnName = Object.keys(columns)[0];
+
     return {
-        async create(arg) {
-            const [rows] = await pool.query(`CALL ${config.createProc}(?)`, [arg]) as [T[], any];
-            return extractSingleResult<T>(rows);
+        async create(arg: string) {
+            const result = await db.insert(table).values({
+                [columnName]: arg
+            });
+
+            return {
+                [columnName]: arg,
+                id: result[0].insertId
+            } as unknown as T;
         },
 
-        async update(id, arg) {
-            const [rows] = await pool.query(`CALL ${config.updateProc}(?, ?)`, [id, arg]) as [T[], any];
-            return extractSingleResult<T>(rows);
+        async update(id: number, arg: string) {
+            await db.update(table).set({
+                [columnName]: arg
+            }).where(eq(table.id, id));
+
+            return {
+                id,
+                [columnName]: arg
+            } as unknown as T;
         },
 
-        async delete(id) {
-            await pool.query(`CALL ${config.deleteProc}(?)`, [id]) as [unknown, any];
+        async delete(id: number) {
+            await db.delete(table).where(eq(table.id, id));
         },
 
         async getAll() {
-            const [rows] = await pool.query(`CALL ${config.getAllProc}()`) as [T[], any];
-            return extractList<T>(rows);
-        },
+            const result = await db.select().from(table);
+
+            return result as T[];
+        }
     };
 }

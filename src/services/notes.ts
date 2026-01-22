@@ -1,39 +1,39 @@
-import { pool } from '../utils/db';
-import { Note } from '../../../shared/dist';
+import { notes } from "../db/schema.js";
+import { initDb } from "../db/client.js";
+import { eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
 
-export async function createNote(payload: {
-    practice_id?: number;
-    provider_id?: number;
-    user_id: number;
-    timestamp: string;
-    note: string;
-}): Promise<void> {
-    const { practice_id, provider_id, user_id, timestamp, note } = payload;
-    await pool.query('CALL create_note(?, ?, ?, ?, ?)', [
-        practice_id ?? null,
-        provider_id ?? null,
-        user_id,
-        timestamp,
-        note,
-    ]);
+const db = initDb();
+
+export type InsertModel = InferInsertModel<typeof notes>;
+export type SelectModel = InferSelectModel<typeof notes>;
+
+export async function createNote(payload: InsertModel): Promise<SelectModel> {
+    const result = await db.insert(notes).values(payload);
+    return (await db.select().from(notes).where(eq(notes.id, result[0].insertId)))[0];
+}
+
+export async function updateNote(noteId: number, note: string): Promise<SelectModel> {
+    await db.update(notes).set({ note }).where(eq(notes.id, noteId));
+    return (await db.select().from(notes).where(eq(notes.id, noteId)))[0];
 }
 
 export async function deleteNote(note_id: number): Promise<void> {
-    await pool.query('CALL delete_note(?)', [note_id]);
+    await db.delete(notes).where(eq(notes.id, note_id));
 }
 
 export async function getNotes(filters: {
-    practice_id?: number;
-    provider_id?: number;
-}): Promise<Note[]> {
-    const { practice_id, provider_id } = filters;
-    const [rows] = await pool.query('CALL get_notes(?, ?)', [
-        practice_id ?? null,
-        provider_id ?? null,
-    ]) as [Note[], any];
-    return rows as Note[];
-}
+    practiceId?: number;
+    providerId?: number;
+}): Promise<SelectModel[]> {
+    const { practiceId, providerId } = filters;
 
-export async function updateNote(note_id: number, note: string): Promise<void> {
-    await pool.query('CALL update_note(?, ?)', [note_id, note]);
+    if (!practiceId && !providerId) return [];
+
+    let where;
+    if (practiceId)
+        where = eq(notes.practiceId, practiceId);
+    else if (providerId)
+        where = eq(notes.providerId, providerId);
+
+    return db.select().from(notes).where(where);
 }
