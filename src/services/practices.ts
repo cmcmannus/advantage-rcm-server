@@ -1,6 +1,6 @@
 import { initDb } from "../db/client.js";
 import { practices, practiceLocations, locations, providerPracticeLocations, providers, statuses, actions, followUpReasons, ehrSystems, pmSystems } from "../db/schema.js";
-import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and } from 'drizzle-orm';
+import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and, notExists, notInArray } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 import { SearchResponseModel } from "./providers.js";
 
@@ -45,6 +45,7 @@ export type SearchParams = {
     city?: string;
     state?: string;
     zip?: string;
+    practiceIds?: string[];
     sortField: keyof typeof practices.$inferSelect;
     sortDir: string;
     pageSize?: number;
@@ -80,6 +81,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         city,
         state,
         zip,
+        practiceIds,
         sortField = 'name', 
         sortDir = 'asc', 
     } = params;
@@ -142,6 +144,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     if (followUpReasonIds) whereConditions.push(inArray(practices.followUpReasonId, followUpReasonIds));
     if (ehrSystemIds) whereConditions.push(inArray(practices.ehrSystemId, ehrSystemIds));
     if (pmSystemIds) whereConditions.push(inArray(practices.pmSystemId, pmSystemIds));
+    if (practiceIds) whereConditions.push(inArray(practices.id, practiceIds.map(id => Number(id))));
     // Dates
     if (followUpDate && followUpOperator) {
         let operator: BinaryOperator = eq;
@@ -223,117 +226,27 @@ export async function getPracticesForDdl(query?: string): Promise<{ value: numbe
     return results;
 }
 
-export type PracticeLocationsSearchParams = {
-    practiceId?: number;
-    practiceLocationId?: number;
-    name?: string;
-    phone?: string;
-    fax?: string;
-    address?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-    pageNumber?: number;
-    pageSize?: number;
-    sortField?: 'name' | 'address' | 'city' | 'state' | 'zip' | 'phone' | 'fax';
-    sortDir?: 'asc' | 'desc';
-}
-
-export async function getPracticeLocations(params: PracticeLocationsSearchParams) {
-    const { 
-        practiceId,
-        practiceLocationId, 
-        name, 
-        phone, 
-        fax, 
-        address,
-        city, 
-        state, 
-        zip, 
-        sortField = 'name', 
-        sortDir = 'asc' 
-    } = params;
-
-    const pageSize = params.pageSize ? Number(params.pageSize) : 25;
-    const pageNumber = params.pageNumber ? Number(params.pageNumber) : 1;
-
-    const query = db.selectDistinct({
-        id: practiceLocations.id,
-        name: practiceLocations.name,
-        phone: practiceLocations.phone,
-        fax: practiceLocations.fax,
-        address: sql`CONCAT(${locations.address1},' ',COALESCE(${locations.address2},''))`,
-        city: locations.city,
-        state: locations.state,
-        zip: locations.zip,
-        address1: locations.address1,
-        address2: locations.address2
+export async function getProvidersAvailableForPractice(practiceId: number, providerName?: string): Promise<{ value: number; label: string }[]> {
+    const existingIds = await db.selectDistinct({
+        providerId: providerPracticeLocations.providerId
     })
-    .from(practiceLocations)
-    .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
-    .$dynamic();
+    .from(providerPracticeLocations)
+    .leftJoin(practiceLocations, eq(providerPracticeLocations.practiceLocationId, practiceLocations.id))
+    .where(eq(practiceLocations.practiceId, practiceId));
 
-    const countQuery = db.selectDistinct({
-        count: count(practiceLocations.id)
+    const results = await db.select({
+        value: providers.id,
+        label: sql<string>`CONCAT(${providers.firstName}, ' ', ${providers.lastName})`
     })
-    .from(practiceLocations)
-    .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
-    .$dynamic();
+    .from(providers)
+    .where(and(
+        notInArray(providers.id, existingIds.map(r => r.providerId)),
+        providerName ? like(sql<string>`CONCAT(${providers.firstName}, ' ', ${providers.lastName})`, `%${providerName}%`) : undefined
+    ))
+    .orderBy(asc(providers.lastName))
+    .limit(50);
 
-    const whereConditions = [];
-
-    if (practiceId) whereConditions.push(eq(practiceLocations.practiceId, practiceId));
-    if (practiceLocationId) whereConditions.push(eq(practiceLocations.id, practiceLocationId));
-
-    // Apply filters
-    if (name) whereConditions.push(like(practiceLocations.name, `%${name}%`));
-    if (phone) whereConditions.push(like(practiceLocations.phone, `%${phone}%`));
-    if (fax) whereConditions.push(like(practiceLocations.fax, `%${fax}%`));
-    if (address) whereConditions.push(like(sql`CONCAT(${locations.address1},' ',COALESCE(${locations.address2},''))`, `%${address}%`));
-    if (city) whereConditions.push(like(locations.city, `%${city}%`));
-    if (state) whereConditions.push(eq(locations.state, state));
-    if (zip) whereConditions.push(like(locations.zip, `%${zip}%`));
-
-    query.where(and(...whereConditions));
-    countQuery.where(and(...whereConditions));
-
-    // Apply sorting
-    if (sortField === 'address') {
-        if (sortDir === 'asc') query.orderBy(asc(locations.address1),asc(locations.address2));
-        else query.orderBy(desc(locations.address1), desc(locations.address2));
-    } else {
-        let table;
-        // Determine sort table
-        if (sortField in practiceLocations) {
-            // Sort by practiceLocations table
-            table = practiceLocations;
-        } else {
-            // Sort by locations table
-            table = locations;
-        }
-
-        if (sortDir === 'asc') query.orderBy(asc(table[sortField as keyof typeof table] as MySqlColumn));
-        else query.orderBy(desc(table[sortDir as keyof typeof table] as MySqlColumn));
-    }
-
-    // Apply paging
-    if (pageSize > 0) {
-        query.limit(pageSize).offset((pageNumber - 1) * pageSize);
-    }
-
-    const [ totalRecords, results ] = await Promise.all([
-        (await countQuery.execute())[0].count,
-        query
-    ]);
-
-    return {
-        data: results,
-        paging: {
-            pageNumber,
-            pageSize,
-            totalPages: totalRecords % pageSize === 0 ? (totalRecords / pageSize) : Math.floor(totalRecords / pageSize) + 1,
-        }
-    };
+    return results;
 }
 
 export type PracticeProvidersSearchParams = {

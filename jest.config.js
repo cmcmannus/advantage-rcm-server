@@ -7,5 +7,5 @@ export default {
   testEnvironment: "node",
   transform: {
     ...tsJestTransformCfg,
-  },
+  }
 };

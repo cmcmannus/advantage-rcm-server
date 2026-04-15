@@ -11,7 +11,7 @@ import {
 const router = express.Router();
 
 router.post('/', async (req, res) => {
-    const payload = req.body as InsertModel;
+    const payload = req.body as InsertModel & { timestamp: string };
     if (!payload) return res.status(400).send();
     const { practiceId, providerId, userId, timestamp, note } = payload;
 
@@ -19,7 +19,10 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ message: 'Missing required fields' });
 
     try {
-        const insertedNote = await createNote(payload);
+        const insertedNote = await createNote({
+            ...payload,
+            timestamp: new Date(payload.timestamp),
+        });
         res.status(201).json(insertedNote);
     } catch (err) {
         res.status(500).json({ message: 'Note creation failed' });
@@ -70,7 +73,7 @@ router.get('/', async (req, res) => {
     }
 
     try {
-        const notes: SelectModel[] = await getNotes({ practiceId, providerId });
+        const notes = await getNotes({ practiceId, providerId });
         res.json(notes);
     } catch (err) {
         res.status(500).json({

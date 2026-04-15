@@ -1,6 +1,6 @@
-import { notes } from "../db/schema.js";
+import { notes, users } from "../db/schema.js";
 import { initDb } from "../db/client.js";
-import { eq, InferInsertModel, InferSelectModel } from "drizzle-orm";
+import { eq, InferInsertModel, InferSelectModel, sql, SQL } from "drizzle-orm";
 
 const db = initDb();
 
@@ -9,7 +9,17 @@ export type SelectModel = InferSelectModel<typeof notes>;
 
 export async function createNote(payload: InsertModel): Promise<SelectModel> {
     const result = await db.insert(notes).values(payload);
-    return (await db.select().from(notes).where(eq(notes.id, result[0].insertId)))[0];
+    return (await db.select({
+        id: notes.id,
+        practiceId: notes.practiceId,
+        providerId: notes.providerId,
+        userId: notes.userId,
+        timestamp: notes.timestamp,
+        note: notes.note,
+        firstName: users.firstName,
+        lastName: users.lastName
+    }).from(notes)
+    .leftJoin(users, eq(notes.userId, users.id)).where(eq(notes.id, result[0].insertId)))[0];
 }
 
 export async function updateNote(noteId: number, note: string): Promise<SelectModel> {
@@ -35,5 +45,15 @@ export async function getNotes(filters: {
     else if (providerId)
         where = eq(notes.providerId, providerId);
 
-    return db.select().from(notes).where(where);
+    return db.select({
+        id: notes.id,
+        practiceId: notes.practiceId,
+        providerId: notes.providerId,
+        userId: notes.userId,
+        timestamp: notes.timestamp,
+        note: notes.note,
+        firstName: users.firstName,
+        lastName: users.lastName
+    }).from(notes)
+    .leftJoin(users, eq(notes.userId, users.id)).where(where);
 }

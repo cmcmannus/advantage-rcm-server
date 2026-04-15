@@ -12,6 +12,7 @@ import {
     ProviderPracticesSearchParams
 } from '../services/providers.js';
 import { exportFunc } from '../services/export.js';
+import { setProviderPrimaryLocation } from '../services/practiceLocations.js';
 
 const router = Router();
 
@@ -40,7 +41,10 @@ router.put('/:id', async (req, res, next) => {
 router.get('/export', async (req, res, next) => {
     try {
         // Export logic would go here
-        const csv = await exportFunc(req.query as unknown as any);
+        const csv = await exportFunc({
+            ...req.query as unknown as any,
+            selectedIds: req.query['selectedIds[]'] as string[]
+        });
         res.header('Content-Type', 'text/csv');
         res.attachment('providers.csv');
         res.send(csv);
@@ -92,6 +96,21 @@ router.get('/:id', async (req, res, next) => {
             return res.status(404).send({ error: 'Provider not found.' });
         }
         res.send(provider);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Set provider primary practice location
+router.post('/:id/primary-location', async (req, res, next) => {
+    try {
+        const providerId = Number(req.params.id);
+        const { practice_location_id, set } = req.body;
+        if (!practice_location_id) {
+            return res.status(400).send({ error: 'practice_location_id is required.' });
+        }
+        const response = await setProviderPrimaryLocation(providerId, practice_location_id, set);
+        res.send({ message: 'Provider primary location updated successfully.' });
     } catch (err) {
         next(err);
     }

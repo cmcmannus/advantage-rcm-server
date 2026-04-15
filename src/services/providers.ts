@@ -1,6 +1,6 @@
 import { initDb } from "../db/client.js";
 import { providers, practices, practiceLocations, locations, providerPracticeLocations, users, statuses, actions, followUpReasons } from "../db/schema.js";
-import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count } from 'drizzle-orm';
+import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count, is } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 
 const db = initDb();
@@ -98,10 +98,6 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         followUpDate,
         followUpOperator,
         followUpReasonIds,
-        address,
-        city,
-        state,
-        zip,
         sortField = 'followUpDate',
         sortDir = 'asc',
         providerIds,
@@ -238,7 +234,8 @@ export async function getProviderPractices(params: ProviderPracticesSearchParams
         address: sql`CONCAT(${locations.address1}, ' ', COALESCE(${locations.address2}, ''))` as SQL<string>,
         city: locations.city,
         state: locations.state,
-        zip: locations.zip
+        zip: locations.zip,
+        isPrimary: providerPracticeLocations.isPrimary
     })
     .from(providerPracticeLocations)
     .leftJoin(practiceLocations, eq(providerPracticeLocations.practiceLocationId, practiceLocations.id))

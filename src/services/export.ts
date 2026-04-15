@@ -23,7 +23,7 @@ export const exportFunc = async ({
                 ...Object.keys(filters).map(key => ({ [key]: filters[key] })),
                 sortField: sort.field,
                 sortDir: sort.direction,
-                providerIds: selectedIds,
+                providerIds: Array.isArray(selectedIds) ? selectedIds : [selectedIds],
                 pageSize: -1
             }
             const records = await providersSearch(searchParams);
@@ -51,7 +51,34 @@ export const exportFunc = async ({
         case 'practices':
             // Implement practice export logic here
             console.log('Exporting practices with filters:', filters, 'sort:', sort, 'selectedIds:', selectedIds);
-            break;
+            // extract filters into format seach function expects
+            const practiceSearchParams: any = {
+                ...Object.keys(filters).map(key => ({ [key]: filters[key] })),
+                sortField: sort.field,
+                sortDir: sort.direction,
+                practiceIds: Array.isArray(selectedIds) ? selectedIds : [selectedIds],
+                pageSize: -1
+            }
+            const practiceRecords = await practicesSearch(practiceSearchParams);
+
+            const practiceOutput = [
+                ['NPI', 'Name', 'Specialization', 'Status', 'Action', 'Follow Up Date', 'Follow Up Reason', 'EHR System', 'PM System'],
+                ...practiceRecords.data.map(rec => ([
+                    rec.npi,
+                    rec.name,
+                    rec.specialization,
+                    rec.status,
+                    rec.action,
+                    rec.followUpDate,
+                    rec.followUpReason,
+                    rec.ehrSystem,
+                    rec.pmSystem
+                ]))
+            ];
+
+            const practiceCsv = practiceOutput.map(row => row.map(item => `"${item ? item.toString().replace(/"/g, '""') : ''}"`).join(',')).join('\n');
+
+            return practiceCsv;
         default:
             throw new Error('Unknown entity type for export');
     }
