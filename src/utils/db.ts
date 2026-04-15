@@ -1,8 +1,5 @@
-import mysql from 'mysql2/promise';
-
-export const pool = mysql.createPool({
-    host: 'localhost',
-    user: 'your_mysql_user',
-    password: 'your_mysql_password',
-    database: 'your_database_name',
-});
+export function formatDate(date: Date) {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+        `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}

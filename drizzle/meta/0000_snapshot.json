@@ -1,0 +1,1057 @@
+{
+  "id": "00000000-0000-0000-0000-000000000000",
+  "prevId": "",
+  "version": "5",
+  "dialect": "mysql",
+  "tables": {
+    "actions": {
+      "name": "actions",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "action": {
+          "autoincrement": false,
+          "name": "action",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "actions_id": {
+          "name": "actions_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "action_UNIQUE": {
+          "name": "action_UNIQUE",
+          "columns": [
+            "action"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "clearing_houses": {
+      "name": "clearing_houses",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clearing_house_name": {
+          "autoincrement": false,
+          "name": "clearing_house_name",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "clearing_houses_id": {
+          "name": "clearing_houses_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "id_UNIQUE": {
+          "name": "id_UNIQUE",
+          "columns": [
+            "id"
+          ]
+        },
+        "clearing_house_name_UNIQUE": {
+          "name": "clearing_house_name_UNIQUE",
+          "columns": [
+            "clearing_house_name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "ehr_systems": {
+      "name": "ehr_systems",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "system_name": {
+          "autoincrement": false,
+          "name": "system_name",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "ehr_systems_id": {
+          "name": "ehr_systems_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "id_UNIQUE": {
+          "name": "id_UNIQUE",
+          "columns": [
+            "id"
+          ]
+        },
+        "system_name_UNIQUE": {
+          "name": "system_name_UNIQUE",
+          "columns": [
+            "system_name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "follow_up_reasons": {
+      "name": "follow_up_reasons",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reason": {
+          "autoincrement": false,
+          "name": "reason",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "follow_up_reasons_id": {
+          "name": "follow_up_reasons_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "reason_UNIQUE": {
+          "name": "reason_UNIQUE",
+          "columns": [
+            "reason"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "notes": {
+      "name": "notes",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "practice_id": {
+          "autoincrement": false,
+          "name": "practice_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "provider_id": {
+          "autoincrement": false,
+          "name": "provider_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_id": {
+          "autoincrement": false,
+          "name": "user_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "timestamp": {
+          "autoincrement": false,
+          "name": "timestamp",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "note": {
+          "autoincrement": false,
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "notes_id": {
+          "name": "notes_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "practice_id": {
+          "name": "practice_id",
+          "columns": [
+            "practice_id"
+          ],
+          "isUnique": false
+        },
+        "provider_id": {
+          "name": "provider_id",
+          "columns": [
+            "provider_id"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "notes_ibfk_1": {
+          "name": "notes_ibfk_1",
+          "tableFrom": "notes",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "notes_ibfk_2": {
+          "name": "notes_ibfk_2",
+          "tableFrom": "notes",
+          "tableTo": "providers",
+          "columnsFrom": [
+            "provider_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "user_id": {
+          "name": "user_id",
+          "tableFrom": "notes",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {
+        "id_UNIQUE": {
+          "name": "id_UNIQUE",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "pm_systems": {
+      "name": "pm_systems",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "system_name": {
+          "autoincrement": false,
+          "name": "system_name",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "pm_systems_id": {
+          "name": "pm_systems_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "system_name_UNIQUE": {
+          "name": "system_name_UNIQUE",
+          "columns": [
+            "system_name"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "practices": {
+      "name": "practices",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "npi": {
+          "autoincrement": false,
+          "name": "npi",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "autoincrement": false,
+          "name": "name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address1": {
+          "autoincrement": false,
+          "name": "address1",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address2": {
+          "autoincrement": false,
+          "name": "address2",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city": {
+          "autoincrement": false,
+          "name": "city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "autoincrement": false,
+          "name": "state",
+          "type": "char(2)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "zip": {
+          "autoincrement": false,
+          "name": "zip",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "autoincrement": false,
+          "name": "phone",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fax": {
+          "autoincrement": false,
+          "name": "fax",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "specialization": {
+          "autoincrement": false,
+          "name": "specialization",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_id": {
+          "autoincrement": false,
+          "name": "status_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action_id": {
+          "autoincrement": false,
+          "name": "action_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "follow_up_date": {
+          "autoincrement": false,
+          "name": "follow_up_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "follow_up_reason_id": {
+          "autoincrement": false,
+          "name": "follow_up_reason_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ehr_system_id": {
+          "autoincrement": false,
+          "name": "ehr_system_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "pm_system_id": {
+          "autoincrement": false,
+          "name": "pm_system_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {
+        "practices_id": {
+          "name": "practices_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "specialization": {
+          "name": "specialization",
+          "columns": [
+            "specialization"
+          ],
+          "isUnique": false
+        },
+        "status": {
+          "name": "status",
+          "columns": [
+            "status_id"
+          ],
+          "isUnique": false
+        },
+        "action": {
+          "name": "action",
+          "columns": [
+            "action_id"
+          ],
+          "isUnique": false
+        },
+        "ehr_system": {
+          "name": "ehr_system",
+          "columns": [
+            "ehr_system_id"
+          ],
+          "isUnique": false
+        },
+        "pm_system": {
+          "name": "pm_system",
+          "columns": [
+            "pm_system_id"
+          ],
+          "isUnique": false
+        },
+        "fk_practice_follow_up_reason_idx": {
+          "name": "fk_practice_follow_up_reason_idx",
+          "columns": [
+            "follow_up_reason_id"
+          ],
+          "isUnique": false
+        },
+        "name": {
+          "name": "name",
+          "columns": [
+            "name",
+            "specialization",
+            "city",
+            "state",
+            "npi"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_practice_action": {
+          "name": "fk_practice_action",
+          "tableFrom": "practices",
+          "tableTo": "actions",
+          "columnsFrom": [
+            "action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_practice_ehr_system": {
+          "name": "fk_practice_ehr_system",
+          "tableFrom": "practices",
+          "tableTo": "ehr_systems",
+          "columnsFrom": [
+            "ehr_system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_practice_follow_up_reason": {
+          "name": "fk_practice_follow_up_reason",
+          "tableFrom": "practices",
+          "tableTo": "follow_up_reasons",
+          "columnsFrom": [
+            "follow_up_reason_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_practice_pm_system": {
+          "name": "fk_practice_pm_system",
+          "tableFrom": "practices",
+          "tableTo": "pm_systems",
+          "columnsFrom": [
+            "pm_system_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_practice_status": {
+          "name": "fk_practice_status",
+          "tableFrom": "practices",
+          "tableTo": "statuses",
+          "columnsFrom": [
+            "status_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {
+        "name_UNIQUE": {
+          "name": "name_UNIQUE",
+          "columns": [
+            "name"
+          ]
+        },
+        "NPI_UNIQUE": {
+          "name": "NPI_UNIQUE",
+          "columns": [
+            "npi"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "providers": {
+      "name": "providers",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "npi": {
+          "autoincrement": false,
+          "name": "npi",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_name": {
+          "autoincrement": false,
+          "name": "first_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "middle_name": {
+          "autoincrement": false,
+          "name": "middle_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_name": {
+          "autoincrement": false,
+          "name": "last_name",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "direct_email": {
+          "autoincrement": false,
+          "name": "direct_email",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address1": {
+          "autoincrement": false,
+          "name": "address1",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "address2": {
+          "autoincrement": false,
+          "name": "address2",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "city": {
+          "autoincrement": false,
+          "name": "city",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "autoincrement": false,
+          "name": "state",
+          "type": "char(2)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "zip": {
+          "autoincrement": false,
+          "name": "zip",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "phone": {
+          "autoincrement": false,
+          "name": "phone",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fax": {
+          "autoincrement": false,
+          "name": "fax",
+          "type": "varchar(15)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "specialization": {
+          "autoincrement": false,
+          "name": "specialization",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "practice_id": {
+          "autoincrement": false,
+          "name": "practice_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sales_rep_id": {
+          "autoincrement": false,
+          "name": "sales_rep_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status_id": {
+          "autoincrement": false,
+          "name": "status_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "action_id": {
+          "autoincrement": false,
+          "name": "action_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "follow_up_date": {
+          "autoincrement": false,
+          "name": "follow_up_date",
+          "type": "date",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "follow_up_reason_id": {
+          "autoincrement": false,
+          "name": "follow_up_reason_id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "compositePrimaryKeys": {
+        "providers_id": {
+          "name": "providers_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {
+        "practice": {
+          "name": "practice",
+          "columns": [
+            "practice_id"
+          ],
+          "isUnique": false
+        },
+        "sales_rep": {
+          "name": "sales_rep",
+          "columns": [
+            "sales_rep_id"
+          ],
+          "isUnique": false
+        },
+        "status": {
+          "name": "status",
+          "columns": [
+            "status_id"
+          ],
+          "isUnique": false
+        },
+        "action": {
+          "name": "action",
+          "columns": [
+            "action_id"
+          ],
+          "isUnique": false
+        },
+        "follow_up_reason": {
+          "name": "follow_up_reason",
+          "columns": [
+            "follow_up_reason_id"
+          ],
+          "isUnique": false
+        },
+        "first_name": {
+          "name": "first_name",
+          "columns": [
+            "first_name",
+            "middle_name",
+            "last_name",
+            "specialization",
+            "city",
+            "state",
+            "npi"
+          ],
+          "isUnique": false
+        }
+      },
+      "foreignKeys": {
+        "fk_provider_action": {
+          "name": "fk_provider_action",
+          "tableFrom": "providers",
+          "tableTo": "actions",
+          "columnsFrom": [
+            "action_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_provider_follow_up_reason": {
+          "name": "fk_provider_follow_up_reason",
+          "tableFrom": "providers",
+          "tableTo": "follow_up_reasons",
+          "columnsFrom": [
+            "follow_up_reason_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_provider_practice": {
+          "name": "fk_provider_practice",
+          "tableFrom": "providers",
+          "tableTo": "practices",
+          "columnsFrom": [
+            "practice_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_provider_sales_rep": {
+          "name": "fk_provider_sales_rep",
+          "tableFrom": "providers",
+          "tableTo": "users",
+          "columnsFrom": [
+            "sales_rep_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "fk_provider_status": {
+          "name": "fk_provider_status",
+          "tableFrom": "providers",
+          "tableTo": "statuses",
+          "columnsFrom": [
+            "status_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "uniqueConstraints": {
+        "NPI_UNIQUE": {
+          "name": "NPI_UNIQUE",
+          "columns": [
+            "npi"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "statuses": {
+      "name": "statuses",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "autoincrement": false,
+          "name": "status",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "statuses_id": {
+          "name": "statuses_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "status_UNIQUE": {
+          "name": "status_UNIQUE",
+          "columns": [
+            "status"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    },
+    "users": {
+      "name": "users",
+      "columns": {
+        "id": {
+          "autoincrement": true,
+          "name": "id",
+          "type": "int unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "email": {
+          "autoincrement": false,
+          "name": "email",
+          "type": "varchar(254)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "password": {
+          "autoincrement": false,
+          "name": "password",
+          "type": "char(60)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "reset_token": {
+          "autoincrement": false,
+          "name": "reset_token",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reset_token_expiration": {
+          "autoincrement": false,
+          "name": "reset_token_expiration",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "first_name": {
+          "autoincrement": false,
+          "name": "first_name",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_name": {
+          "autoincrement": false,
+          "name": "last_name",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "sales_rep": {
+          "default": 0,
+          "autoincrement": false,
+          "name": "sales_rep",
+          "type": "tinyint(1)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "access_level": {
+          "default": 3,
+          "autoincrement": false,
+          "name": "access_level",
+          "type": "tinyint unsigned",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "active": {
+          "default": 1,
+          "autoincrement": false,
+          "name": "active",
+          "type": "tinyint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created": {
+          "default": "(CURRENT_TIMESTAMP)",
+          "autoincrement": false,
+          "name": "created",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated": {
+          "default": "(CURRENT_TIMESTAMP)",
+          "autoincrement": false,
+          "name": "updated",
+          "type": "datetime",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "compositePrimaryKeys": {
+        "users_id": {
+          "name": "users_id",
+          "columns": [
+            "id"
+          ]
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "uniqueConstraints": {
+        "email_UNIQUE": {
+          "name": "email_UNIQUE",
+          "columns": [
+            "email"
+          ]
+        },
+        "reset_token_UNIQUE": {
+          "name": "reset_token_UNIQUE",
+          "columns": [
+            "reset_token"
+          ]
+        }
+      },
+      "checkConstraint": {}
+    }
+  },
+  "views": {},
+  "_meta": {
+    "schemas": {},
+    "tables": {},
+    "columns": {}
+  },
+  "internal": {
+    "tables": {
+      "users": {
+        "columns": {
+          "created": {
+            "isDefaultAnExpression": true
+          },
+          "updated": {
+            "isDefaultAnExpression": true
+          }
+        }
+      }
+    },
+    "indexes": {}
+  }
+}
