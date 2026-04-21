@@ -13,7 +13,7 @@ import {
 } from '../services/providers.js';
 import { exportFunc } from '../services/export.js';
 import { setProviderPrimaryLocation } from '../services/practiceLocations.js';
-import { addToUserFavorites, removeFromUserFavorites } from 'services/favorites.js'; 
+import { addToUserFavorites, removeFromUserFavorites } from '../services/favorites.js'; 
 const router = Router();
 
 // Create a provider
