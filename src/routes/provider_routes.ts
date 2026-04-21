@@ -13,7 +13,7 @@ import {
 } from '../services/providers.js';
 import { exportFunc } from '../services/export.js';
 import { setProviderPrimaryLocation } from '../services/practiceLocations.js';
-
+import { addToUserFavorites, removeFromUserFavorites } from 'services/favorites.js'; 
 const router = Router();
 
 // Create a provider
@@ -66,7 +66,11 @@ router.delete('/:id', async (req, res, next) => {
 // Get providers with optional filters
 router.get('/', async (req, res, next) => {
     try {
-        const results = await search(req.query as unknown as SearchParams)
+        let params = req.query as unknown as SearchParams;
+        if (params.favoritesOnly === 'true') {
+            params.userId = (req as any).user.id;
+        }
+        const results = await search(params);
         res.send(results);
     } catch (err) {
         next(err);
@@ -91,11 +95,41 @@ router.get('/:id/practices', async (req, res, next) => {
 // Get provider by ID
 router.get('/:id', async (req, res, next) => {
     try {
-        const provider = await getProvider(Number(req.params.id));
+        const provider = await getProvider(Number(req.params.id), (req as any).user.id);
         if (!provider) {
             return res.status(404).send({ error: 'Provider not found.' });
         }
         res.send(provider);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Favorites routes
+
+// Set favorite
+router.post('/:id/favorite', async (req, res, next) => {
+    try {
+        const providerId = Number(req.params.id);
+        const userId = (req as any).user.id;
+        
+        await addToUserFavorites(userId, undefined, providerId);
+
+        res.send({ message: 'Provider marked as favorite.' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Delete favorite
+router.delete('/:id/favorite', async (req, res, next) => {
+    try {
+        const providerId = Number(req.params.id);
+        const userId = (req as any).user.id;
+        
+        await removeFromUserFavorites(userId, undefined, providerId);
+
+        res.send({ message: 'Provider removed from favorites.' });
     } catch (err) {
         next(err);
     }

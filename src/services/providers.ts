@@ -1,5 +1,5 @@
 import { initDb } from "../db/client.js";
-import { providers, practices, practiceLocations, locations, providerPracticeLocations, users, statuses, actions, followUpReasons } from "../db/schema.js";
+import { providers, practices, practiceLocations, locations, providerPracticeLocations, users, statuses, actions, followUpReasons, userFavorites } from "../db/schema.js";
 import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count, is } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 
@@ -7,7 +7,9 @@ const db = initDb();
 
 type ProvidersType = typeof providers;
 export type InsertModel = InferInsertModel<ProvidersType>;
-export type SelectModel = InferSelectModel<ProvidersType>;
+export type SelectModel = InferSelectModel<ProvidersType> & {
+    favorite?: boolean;
+};
 export type SearchParams = {
     npi?: string;
     firstName: string;
@@ -33,6 +35,8 @@ export type SearchParams = {
     pageNumber?: number;
     providerIds: number[] | null;
     adminName?: string;
+    favoritesOnly?: string;
+    userId?: number;
 };
 
 export async function createProvider(payload: InsertModel): Promise<SelectModel> {
@@ -50,8 +54,33 @@ export async function deleteProvider(providerId: number): Promise<void> {
     await db.delete(providers).where(eq(providers.id, providerId))
 }
 
-export async function getProvider(id: number): Promise<SelectModel> {
-    const results = await db.select().from(providers).where(eq(providers.id, id));
+export async function getProvider(id: number, userId: number): Promise<SelectModel> {
+    const results = await db.select({
+        id: providers.id,
+        npi: providers.npi,
+        firstName: providers.firstName,
+        middleName: providers.middleName,
+        lastName: providers.lastName,
+        suffix: providers.suffix,
+        directEmail: providers.directEmail,
+        specialization: providers.specialization,
+        email: providers.email,
+        salesRepId: providers.salesRepId,
+        statusId: providers.statusId,
+        actionId: providers.actionId,
+        followUpDate: providers.followUpDate,
+        followUpReasonId: providers.followUpReasonId,
+        adminEmail: providers.adminEmail,
+        adminName: providers.adminName,
+        phone: providers.phone,
+        favorite: sql<boolean>`CASE WHEN ${userFavorites.id} IS NOT NULL THEN true ELSE false END`
+    })
+        .from(providers)
+        .leftJoin(userFavorites, and(
+            eq(userFavorites.providerId, providers.id), 
+            eq(userFavorites.userId, userId)
+        ))
+        .where(eq(providers.id, id));
     if (results.length > 0) return results[0];
     throw new Error('Provider not found!');
 }
@@ -143,7 +172,19 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
         // .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
         // .leftJoin(practiceLocations, eq(practiceLocations.practiceId, providerPracticeLocations.providerId))
-        // .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
+    // .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
+
+    if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
+        query.innerJoin(userFavorites, and(
+            eq(userFavorites.userId, params.userId!),
+            eq(userFavorites.practiceId, practices.id)
+        ));
+
+        countQuery.innerJoin(userFavorites, and(
+            eq(userFavorites.practiceId, practices.id),
+            eq(userFavorites.userId, params.userId!)
+        ));
+    }
 
     const whereConditions = [];
 

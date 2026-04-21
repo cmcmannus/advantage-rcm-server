@@ -5,7 +5,7 @@ export default defineConfig({
     out: './drizzle',
     dialect: 'mysql',
     dbCredentials: {
-        host: 'colefusion-lab',
+        host: 'mysql.colefusion.local',
         port: 3306,
         user: 'arcm_api',
         password: '3-URwrf58FF*',

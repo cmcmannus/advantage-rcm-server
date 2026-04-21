@@ -1,5 +1,5 @@
 import { initDb } from "../db/client.js";
-import { practices, practiceLocations, locations, providerPracticeLocations, providers, statuses, actions, followUpReasons, ehrSystems, pmSystems } from "../db/schema.js";
+import { practices, practiceLocations, locations, providerPracticeLocations, providers, statuses, actions, followUpReasons, ehrSystems, pmSystems, userFavorites } from "../db/schema.js";
 import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and, notExists, notInArray } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 import { SearchResponseModel } from "./providers.js";
@@ -24,8 +24,27 @@ export async function deletePractice(practiceId: number): Promise<void> {
     await db.delete(practices).where(eq(practices.id, practiceId))
 }
 
-export async function getPractice(id: number): Promise<SelectModel> {
-    const results = await db.select().from(practices).where(eq(practices.id, id));
+export async function getPractice(id: number, userId: number): Promise<SelectModel> {
+    const results = await db.select({
+        id: practices.id,
+        npi: practices.npi,
+        name: practices.name,
+        specialization: practices.specialization,
+        statusId: practices.statusId,
+        actionId: practices.actionId,
+        followUpDate: practices.followUpDate,
+        followUpReasonId: practices.followUpReasonId,
+        ehrSystemId: practices.ehrSystemId,
+        pmSystemId: practices.pmSystemId,
+        favorite: sql<boolean>`CASE WHEN ${userFavorites.id} IS NOT NULL THEN true ELSE false END`
+    })
+        .from(practices)
+        .leftJoin(userFavorites, and(
+            eq(userFavorites.practiceId, practices.id),
+            eq(userFavorites.userId, userId)
+        ))
+        .where(eq(practices.id, id));
+    
     if (results.length > 0) return results[0];
     throw new Error('Practice not found!');
 }
@@ -46,10 +65,12 @@ export type SearchParams = {
     state?: string;
     zip?: string;
     practiceIds?: string[];
+    favoritesOnly?: string;
     sortField: keyof typeof practices.$inferSelect;
     sortDir: string;
     pageSize?: number;
     pageNumber?: number;
+    userId?: number; // needed for favorites filtering
 };
 
 export type SearchResponse = {
@@ -127,6 +148,18 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         .leftJoin(practiceLocations, eq(practiceLocations.practiceId, practices.id))
         .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
         .$dynamic();
+
+    if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
+        query.innerJoin(userFavorites, and(
+            eq(userFavorites.userId, params.userId!),
+            eq(userFavorites.practiceId, practices.id)
+        ));
+
+        countQuery.innerJoin(userFavorites, and(
+            eq(userFavorites.practiceId, practices.id),
+            eq(userFavorites.userId, params.userId!)
+        ));
+    }
 
     const whereConditions = [];
 
