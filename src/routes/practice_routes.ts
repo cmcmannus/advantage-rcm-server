@@ -24,7 +24,7 @@ import {
     updateProviderPracticeLocations
 } from '../services/practiceLocations.js';
 import { exportFunc } from '../services/export.js';
-import { addToUserFavorites, removeFromUserFavorites } from 'services/favorites.js';
+import { addToUserFavorites, removeFromUserFavorites } from '../services/favorites.js';
 
 const router = Router();
 
