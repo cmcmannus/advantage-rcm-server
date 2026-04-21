@@ -24,13 +24,18 @@ import {
     updateProviderPracticeLocations
 } from '../services/practiceLocations.js';
 import { exportFunc } from '../services/export.js';
+import { addToUserFavorites, removeFromUserFavorites } from 'services/favorites.js';
 
 const router = Router();
 
 // Get practices with optional filters
 router.get('/', async (req: any, res, next) => {
     try {
-        const results = await search(req.query as SearchParams);
+        let params = req.query as SearchParams;
+        if (params.favoritesOnly === 'true') {
+            params.userId = (req as any).user.id;
+        }
+        const results = await search(params);
         res.send(results);
     } catch (err) {
         next(err);
@@ -108,11 +113,41 @@ router.get('/export', async (req, res, next) => {
 // Get practice by ID
 router.get('/:id', async (req, res, next) => {
     try {
-        const practice = await getPractice(Number(req.params.id));
+        const practice = await getPractice(Number(req.params.id), (req as any).user.id);
         if (!practice) {
             return res.status(404).send({ message: 'Practice not found.' });
         }
         res.send(practice);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Favorites routes
+
+// Set favorite
+router.post('/:id/favorite', async (req, res, next) => {
+    try {
+        const practiceId = Number(req.params.id);
+        const userId = (req as any).user.id;
+        
+        await addToUserFavorites(userId, practiceId);
+
+        res.send({ message: 'Provider marked as favorite.' });
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Delete favorite
+router.delete('/:id/favorite', async (req, res, next) => {
+    try {
+        const practiceId = Number(req.params.id);
+        const userId = (req as any).user.id;
+        
+        await removeFromUserFavorites(userId, practiceId);
+
+        res.send({ message: 'Provider removed from favorites.' });
     } catch (err) {
         next(err);
     }
