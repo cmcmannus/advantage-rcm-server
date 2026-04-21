@@ -1,6 +1,6 @@
 import { and, eq } from "drizzle-orm";
-import { initDb } from "../db/client";
-import { userFavorites } from "../db/schema";
+import { initDb } from "../db/client.js";
+import { userFavorites } from "../db/schema.js";
 
 const db = initDb();
 
