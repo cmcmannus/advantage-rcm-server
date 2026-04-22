@@ -1,0 +1,40 @@
+name: Deploy to Staging
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - staging
+
+jobs:
+  deploy:
+    if: github.event_name == 'push' || github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.STAGING_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
+          chmod 600 ~/.ssh/id_ed25519
+          echo "Host: ${{ secrets.STAGING_SERVER_HOST }}"
+          ssh-keyscan -p 12345 -H ${{ secrets.STAGING_SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Deploy to server
+        run: |
+          ssh -i ~/.ssh/id_ed25519 -p 12345 ${{ secrets.STAGING_SERVER_USER }}@${{ secrets.STAGING_SERVER_HOST }} << 'EOF'
+            cd /app/server
+
+            # Pull latest staging code
+            git fetch --all
+            git reset --hard origin/staging
+
+            # Install deps & build static site
+            npm install
+            npm run build
+            pkill node
+            npm run start &
+          EOF
