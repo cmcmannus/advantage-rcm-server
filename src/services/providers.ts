@@ -177,12 +177,12 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
         query.innerJoin(userFavorites, and(
             eq(userFavorites.userId, params.userId!),
-            eq(userFavorites.practiceId, practices.id)
+            eq(userFavorites.providerId, providers.id)
         ));
 
         countQuery.innerJoin(userFavorites, and(
-            eq(userFavorites.practiceId, practices.id),
-            eq(userFavorites.userId, params.userId!)
+            eq(userFavorites.userId, params.userId!),
+            eq(userFavorites.providerId, providers.id)
         ));
     }
 
