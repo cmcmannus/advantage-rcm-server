@@ -36,5 +36,5 @@ jobs:
             npm install
             npm run build
             pkill node
-            npm run start &
+            npm run start
           EOF
