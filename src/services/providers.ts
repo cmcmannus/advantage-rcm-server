@@ -39,9 +39,9 @@ export type SearchParams = {
     userId?: number;
 };
 
-export async function createProvider(payload: InsertModel): Promise<SelectModel> {
+export async function createProvider(payload: InsertModel): Promise<number> {
     const result = await db.insert(providers).values(payload);
-    return (await db.select().from(providers).where(eq(providers.id, result[0].insertId)))[0];
+    return result[0].insertId;
 }
 
 export async function updateProvider(payload: SelectModel): Promise<SelectModel> {
@@ -107,10 +107,6 @@ export type SearchModel = {
     action: string | null;
     followUpDate: Date | null;
     followUpReason: string | null;
-    // address: string | null;
-    // city: string | null;
-    // state: string | null;
-    // zip: string | null;
 }
 
 export async function search(params: SearchParams): Promise<SearchResponseModel<SearchModel>> {
@@ -153,14 +149,11 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         // city: locations.city,
         // state: locations.state,
         // zip: locations.zip,
-    }).from(providers)
+}).from(providers)
         .leftJoin(users, eq(users.id, providers.salesRepId))
         .leftJoin(statuses, eq(statuses.id, providers.statusId))
         .leftJoin(actions, eq(actions.id, providers.actionId))
         .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
-        // .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
-        // .leftJoin(practiceLocations, eq(practiceLocations.practiceId, providerPracticeLocations.providerId))
-        // .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
         .$dynamic();
 
     const countQuery = db.select({
@@ -170,9 +163,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         .leftJoin(statuses, eq(statuses.id, providers.statusId))
         .leftJoin(actions, eq(actions.id, providers.actionId))
         .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
-        // .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
-        // .leftJoin(practiceLocations, eq(practiceLocations.practiceId, providerPracticeLocations.providerId))
-    // .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
+        .$dynamic();
 
     if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
         query.innerJoin(userFavorites, and(
@@ -188,7 +179,6 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
 
     const whereConditions = [];
 
-    // Apply filters
     if (npi) whereConditions.push(like(providers.npi, `%${npi}%`));
     if (firstName) whereConditions.push(like(providers.firstName, `%${firstName}%`));
     if (middleName) whereConditions.push(like(providers.middleName, `%${middleName}%`));
@@ -203,13 +193,6 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         whereConditions.push(operator(providers.followUpDate, followUpDate));
     }
     if (followUpReasonIds && followUpReasonIds.length > 0) whereConditions.push(inArray(providers.followUpReasonId, followUpReasonIds));
-    // if (address) {
-    //     whereConditions.push(like(locations.address1, `%${address}%`));
-    //     whereConditions.push(like(locations.address2, `%${address}%`));
-    // }
-    // if (city) whereConditions.push(like(locations.city, `%${city}%`));
-    // if (state) whereConditions.push(eq(locations.state, state));
-    // if (zip) whereConditions.push(like(locations.zip, `%${zip}%`));
     if (providerIds && providerIds.length > 0) whereConditions.push(inArray(providers.id, providerIds));
     if (adminName) whereConditions.push(like(providers.adminName, `%${adminName}%`));
 

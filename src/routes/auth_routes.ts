@@ -9,13 +9,17 @@ const router = express.Router();
 router.post('/login', async (req, res) => {
     const { email, password } = req.body;
 
+    if (!email || !password) {
+        return res.status(400).json({ message: 'Email and password are required' });
+    }
+
     try {
         const user = await loginUser({ email, password });
 
         if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
-        const accessToken = jwt.sign(user, process.env.JWT_SECRET!, { expiresIn: '15m' });
-        const refreshToken = jwt.sign(user, process.env.JWT_REFRESH_SECRET!, { expiresIn: '30d' });
+        const accessToken = jwt.sign(user, process.env.JWT_SECRET!, { expiresIn: '1h' });
+        const refreshToken = jwt.sign(user, process.env.JWT_REFRESH_SECRET!, { expiresIn: '7d' });
 
         res.json({ accessToken, user, refreshToken });
 
@@ -35,7 +39,7 @@ router.post('/refresh-token', (req, res) => {
         delete user.iat;
 
         const newAccessToken = jwt.sign(user, process.env.JWT_SECRET!, { expiresIn: '1h' });
-        const newRefreshToken = jwt.sign(user, process.env.JWT_REFRESH_SECRET!, { expiresIn: '30d' });
+        const newRefreshToken = jwt.sign(user, process.env.JWT_REFRESH_SECRET!, { expiresIn: '7d' });
         res.json({ accessToken: newAccessToken, refreshToken: newRefreshToken });
     } catch (ex) {
         return res.status(401).send({ message: 'Invalid refresh token' });

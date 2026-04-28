@@ -1,6 +1,6 @@
 import { initDb } from "../db/client.js";
 import { practices, practiceLocations, locations, providerPracticeLocations, providers, statuses, actions, followUpReasons, ehrSystems, pmSystems, userFavorites } from "../db/schema.js";
-import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and, notExists, notInArray } from 'drizzle-orm';
+import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and, notExists, notInArray, exists } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 import { SearchResponseModel } from "./providers.js";
 
@@ -9,15 +9,15 @@ const db = initDb();
 export type InsertModel = InferInsertModel<typeof practices>;
 export type SelectModel = InferSelectModel<typeof practices>;
 
-export async function createPractice(payload: InsertModel): Promise<SelectModel> {
+export async function createPractice(payload: InsertModel): Promise<number> {
     const result = await db.insert(practices).values(payload);
-    return (await db.select().from(practices).where(eq(practices.id, result[0].insertId)))[0];
+    return result[0].insertId;
 }
 
 export async function updatePractice(payload: SelectModel): Promise<SelectModel> {
     const { id, ...updateModel } = payload;
     await db.update(practices).set(updateModel).where(eq(practices.id, id));
-    return (await db.select().from(practices).where(eq(practices.id, id)))[0];
+    return payload;
 }
 
 export async function deletePractice(practiceId: number): Promise<void> {
@@ -260,11 +260,11 @@ export async function getPracticesForDdl(query?: string): Promise<{ value: numbe
 }
 
 export async function getProvidersAvailableForPractice(practiceId: number, providerName?: string): Promise<{ value: number; label: string }[]> {
-    const existingIds = await db.selectDistinct({
+    const associatedProviders = db.selectDistinct({
         providerId: providerPracticeLocations.providerId
     })
     .from(providerPracticeLocations)
-    .leftJoin(practiceLocations, eq(providerPracticeLocations.practiceLocationId, practiceLocations.id))
+    .innerJoin(practiceLocations, eq(providerPracticeLocations.practiceLocationId, practiceLocations.id))
     .where(eq(practiceLocations.practiceId, practiceId));
 
     const results = await db.select({
@@ -273,7 +273,7 @@ export async function getProvidersAvailableForPractice(practiceId: number, provi
     })
     .from(providers)
     .where(and(
-        notInArray(providers.id, existingIds.map(r => r.providerId)),
+        notInArray(providers.id, associatedProviders),
         providerName ? like(sql<string>`CONCAT(${providers.firstName}, ' ', ${providers.lastName})`, `%${providerName}%`) : undefined
     ))
     .orderBy(asc(providers.lastName))

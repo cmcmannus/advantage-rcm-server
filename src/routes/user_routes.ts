@@ -1,8 +1,21 @@
 import express from 'express';
 import { createUser, deactivateUser, updateUser, getUserById, getUsers, setResetToken, InsertModel, SearchParams, SelectModel, resetPassword, loginUser, deleteUser } from '../services/users.js';
 import { generateResetToken, tokenExpiry } from '../utils/token.js';
+import { createUserSchema, updateUserSchema, changePasswordSchema, idParamSchema } from '../utils/validation.js';
+import { ZodError } from 'zod';
+import { AuthenticatedRequest } from '../middleware/auth.js';
 
 const router = express.Router();
+
+const parseIdParam = (id: string) => {
+    const parsed = idParamSchema.safeParse({ id });
+    if (!parsed.success) return null;
+    return Number(parsed.data.id);
+};
+
+const formatZodError = (error: ZodError) => {
+    return error.errors.map(e => ({ field: e.path.join('.'), message: e.message }));
+};
 
 // Get All
 router.get('/', async (req, res) => {
@@ -27,10 +40,13 @@ router.get('/', async (req, res) => {
 // Create
 router.post('/', async (req, res) => {
     try {
-        const user = await createUser(req.body);
+        const parsed = createUserSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ errors: formatZodError(parsed.error) });
+        }
+        const user = await createUser(parsed.data);
         if (!user) return res.status(400).json({ message: 'User creation failed' });
         res.status(201).json(user);
-        
     } catch (err) {
         res.status(500).json({ message: 'User creation failed' });
     }
@@ -39,8 +55,12 @@ router.post('/', async (req, res) => {
 // Update
 router.put('/', async (req, res) => {
     try {
-        const user = await updateUser(req.body);
-        res.status(201).json(user);
+        const parsed = updateUserSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ errors: formatZodError(parsed.error) });
+        }
+        const user = await updateUser(parsed.data as SelectModel);
+        res.status(200).json(user);
     } catch (err) {
         res.status(500).json({ message: 'User update failed' });
     }
@@ -48,12 +68,11 @@ router.put('/', async (req, res) => {
 
 // Delete
 router.delete('/:id', async (req, res) => {
-    const { id } = req.params;
-
-    if (!id || isNaN(Number(id))) return res.status(400).json({ message: 'Invalid user ID' });
+    const numericId = parseIdParam(req.params.id);
+    if (!numericId) return res.status(400).json({ message: 'Invalid user ID' });
 
     try {
-        const result = await deleteUser(parseInt(id as string));
+        const result = await deleteUser(numericId);
         if (result) res.status(200).json({ message: 'User deleted successfully' });
         else res.status(404).json({ message: 'User not found' });
     } catch (err) {
@@ -98,24 +117,26 @@ router.get('/sales-reps', async (req, res) => {
     }
 });
 
-router.post('/change-password', async (req, res) => {
-    const { currentPassword, newPassword } = req.body;
-
-    if (!currentPassword || !newPassword) {
-        return res.status(400).json({ message: 'Token and new password are required' });
-    }
-
-    const user = (req as any).user;
-    const dbUser = await loginUser({ email: user.email, password: currentPassword });
-
-    if (!dbUser) return res.status(404).json({ message: 'Current password is incorrect' });
-
-    const token = generateResetToken();
-    const expiry = tokenExpiry(0.1); // 0.1 hour expiry
-
-    await setResetToken(dbUser.id as number, token, expiry);
-
+router.post('/change-password', async (req: AuthenticatedRequest, res) => {
     try {
+        const parsed = changePasswordSchema.safeParse(req.body);
+        if (!parsed.success) {
+            return res.status(400).json({ errors: formatZodError(parsed.error) });
+        }
+        const { currentPassword, newPassword } = parsed.data;
+
+        if (!req.user?.email) {
+            return res.status(401).json({ message: 'User not authenticated' });
+        }
+
+        const dbUser = await loginUser({ email: req.user.email, password: currentPassword });
+        if (!dbUser) return res.status(401).json({ message: 'Current password is incorrect' });
+
+        const token = generateResetToken();
+        const expiry = tokenExpiry(0.1);
+
+        await setResetToken(dbUser.id as number, token, expiry);
+
         const result = await resetPassword({ token, newPassword });
         if (result) res.status(200).json({ message: 'Password reset successful' });
         else res.status(400).json({ message: 'Password reset failed' });
@@ -126,12 +147,11 @@ router.post('/change-password', async (req, res) => {
 
 // Get User
 router.get('/:id', async (req, res) => {
-    const { id } = req.params;
-
-    if (!id || isNaN(Number(id))) return res.status(400).json({ message: 'Invalid user ID' });
+    const numericId = parseIdParam(req.params.id);
+    if (!numericId) return res.status(400).json({ message: 'Invalid user ID' });
 
     try {
-        const user = await getUserById(parseInt(id));
+        const user = await getUserById(numericId);
         if (!user) return res.status(404).json({ message: 'User not found' });
         res.json(user);
     } catch (err) {
@@ -141,12 +161,11 @@ router.get('/:id', async (req, res) => {
 
 // Deactivate
 router.put('/:id/deactivate', async (req, res) => {
-    const { id } = req.params;
-
-    if (!id || isNaN(Number(id))) return res.status(400).json({ message: 'Invalid user ID' });
+    const numericId = parseIdParam(req.params.id);
+    if (!numericId) return res.status(400).json({ message: 'Invalid user ID' });
 
     try {
-        await deactivateUser(parseInt(id as string));
+        await deactivateUser(numericId);
         res.status(204).send();
     } catch (err) {
         res.status(500).json({ message: 'User deactivation failed' });

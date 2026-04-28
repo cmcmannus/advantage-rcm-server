@@ -4,6 +4,7 @@ import * as bcrypt from 'bcryptjs';
 import { eq, asc, desc, and, InferSelectModel, InferInsertModel, like, gt } from "drizzle-orm";
 import { formatDate } from "../utils/db.js";
 import { Emailer } from "./email.js";
+import * as crypto from 'crypto';
 
 const db = initDb();
 
@@ -24,16 +25,19 @@ export type SearchParams = {
 export type UserResponseModel = Omit<SelectModel, 'password' | 'resetToken' | 'resetTokenExpiration'>;
 type TransformModel = Partial<SelectModel>;
 
-const mapDbUserToResponse = (model: SelectModel): UserResponseModel => {
-    const { password, resetToken, resetTokenExpiration, ...user } = model;
+const mapDbUserToResponse = (model: Partial<SelectModel>): UserResponseModel => {
+    const { password, resetToken, resetTokenExpiration, ...user } = model as SelectModel;
     return user;
 }
 
 const generateRandomPassword = () => {
     const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+[]{}|;:,.<>?';
+    const charsLength = chars.length;
+    const randomValues = new Uint32Array(12);
+    crypto.getRandomValues(randomValues);
     let password = '';
     for (let i = 0; i < 12; i++) {
-        password += chars.charAt(Math.floor(Math.random() * chars.length));
+        password += chars[randomValues[i] % charsLength];
     }
     return password;
 }
@@ -41,15 +45,25 @@ const generateRandomPassword = () => {
 export async function createUser(payload: InsertModel): Promise<UserResponseModel | null> {
     const hashed_pass = await bcrypt.hash(generateRandomPassword(), 10);
 
-    await db.insert(users).values({
+    const result = await db.insert(users).values({
         ...payload,
         password: hashed_pass,
     });
 
-    const user = await db.select().from(users).where(eq(users.email, payload.email));
-
     const mailer = new Emailer();
     await mailer.sendWelcomeEmail(payload.email);
+
+    const user = await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        salesRep: users.salesRep,
+        accessLevel: users.accessLevel,
+        active: users.active,
+        created: users.created,
+        updated: users.updated
+    }).from(users).where(eq(users.id, result[0].insertId));
 
     if (user && user[0]) {
         return mapDbUserToResponse(user[0]);
@@ -58,34 +72,37 @@ export async function createUser(payload: InsertModel): Promise<UserResponseMode
 }
 
 export async function updateUser(payload: SelectModel): Promise<UserResponseModel> {
-    let user = (await db.select().from(users).where(eq(users.id, payload.id)))?.[0];
+    const existingUser = (await db.select().from(users).where(eq(users.id, payload.id)))?.[0];
 
-    if (!user) {
+    if (!existingUser) {
         throw new Error('User not found');
     }
 
-    const update_data: {
-        email?: string;
-        password?: string;
-        firstName?: string;
-        lastName?: string;
-        salesRep?: number;
-        accessLevel?: number;
-        updated?: Date;
-    } = {};
+    type UpdateData = Partial<{
+        email: string;
+        password: string;
+        firstName: string;
+        lastName: string;
+        salesRep: number;
+        accessLevel: number;
+        updated: Date;
+    }>;
 
-    if (payload.email) (update_data as any).email = payload.email;
-    if (payload.firstName) (update_data as any).firstName = payload.firstName;
-    if (payload.lastName) (update_data as any).lastName = payload.lastName;
-    if (payload.salesRep !== undefined) (update_data as any).salesRep = payload.salesRep ? 1 : 0;
-    if (payload.accessLevel !== undefined) (update_data as any).accessLevel = payload.accessLevel;
+    const update_data: UpdateData = {};
+
+    if (payload.email) update_data.email = payload.email;
+    if (payload.firstName) update_data.firstName = payload.firstName;
+    if (payload.lastName) update_data.lastName = payload.lastName;
+    if (payload.salesRep !== undefined) update_data.salesRep = payload.salesRep ? 1 : 0;
+    if (payload.accessLevel !== undefined) update_data.accessLevel = payload.accessLevel;
     update_data.updated = new Date();
 
     await db.update(users).set(update_data).where(eq(users.id, payload.id));
 
-    user = (await db.select().from(users).where(eq(users.id, payload.id)))?.[0];
-    
-    return mapDbUserToResponse(user);
+    return mapDbUserToResponse({
+        ...existingUser,
+        ...update_data
+    } as SelectModel);
 }
 
 export async function deleteUser(id: number): Promise<boolean> {
@@ -111,7 +128,17 @@ export async function deactivateUser(id: number): Promise<boolean> {
 export async function getUserById(id: number): Promise<UserResponseModel | null> {
     if (!id) return null;
 
-    const user = (await db.select().from(users).where(eq(users.id, id)))?.[0];
+    const user = (await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        salesRep: users.salesRep,
+        accessLevel: users.accessLevel,
+        active: users.active,
+        created: users.created,
+        updated: users.updated
+    }).from(users).where(eq(users.id, id)))?.[0];
     if (!user) return null;
 
     return mapDbUserToResponse(user);
@@ -121,7 +148,18 @@ export async function loginUser(data: {
     email: string;
     password: string;
 }): Promise<UserResponseModel | null> {
-    const user = (await db.select().from(users)
+    const user = (await db.select({
+        id: users.id,
+        email: users.email,
+        firstName: users.firstName,
+        lastName: users.lastName,
+        salesRep: users.salesRep,
+        accessLevel: users.accessLevel,
+        active: users.active,
+        created: users.created,
+        updated: users.updated,
+        password: users.password
+    }).from(users)
         .where(
             and(
                 eq(users.email, data.email),
@@ -132,15 +170,9 @@ export async function loginUser(data: {
 
     if (!user) return null;
 
-    if (!bcrypt.compareSync(data.password, user.password)) return null; // No user found
+    if (!bcrypt.compareSync(data.password, user.password)) return null;
 
-    let retUser: TransformModel = {...user};
-
-    delete retUser.password;
-    delete retUser.resetToken;
-    delete retUser.resetTokenExpiration;
-
-    return retUser as UserResponseModel; // Logged in user is returned
+    return mapDbUserToResponse(user);
 }
 
 export async function getUsers(params: SearchParams) {

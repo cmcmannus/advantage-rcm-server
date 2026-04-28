@@ -149,7 +149,7 @@ export const providers = mysqlTable("providers", {
 	adminEmail: varchar("admin_email", { length: 255 }),
 	phone: varchar({ length: 10 }),
 },
-	(table) => [
+(table) => [
 		index("sales_rep").on(table.salesRepId),
 		index("status").on(table.statusId),
 		index("action").on(table.actionId),
@@ -185,7 +185,7 @@ export const userFavorites = mysqlTable("user_favorites", {
 export const users = mysqlTable("users", {
 	id: int({ unsigned: true }).autoincrement().notNull(),
 	email: varchar({ length: 254 }).notNull(),
-	password: char({ length: 60 }).notNull(),
+	password: varchar({ length: 60 }).notNull(),
 	resetToken: char("reset_token", { length: 64 }),
 	resetTokenExpiration: datetime("reset_token_expiration", { mode: 'date' }),
 	firstName: varchar("first_name", { length: 45 }).notNull(),

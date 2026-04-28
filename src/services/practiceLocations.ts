@@ -479,21 +479,22 @@ export async function updateProviderPracticeLocations(providerId: number, practi
         if (locationIds.length === 0) {
             return;
         }
-        for (const locationId of locationIds) {
-            const existing = await db.select().from(providerPracticeLocations).where(
-                and(
-                    eq(providerPracticeLocations.providerId, providerId),
-                    eq(providerPracticeLocations.practiceLocationId, locationId)
-                )
-            ).limit(1).execute();
-
-            if (existing.length === 0) {
-                await db.insert(providerPracticeLocations).values({
+        const existing = await db.select({ practiceLocationId: providerPracticeLocations.practiceLocationId })
+            .from(providerPracticeLocations)
+            .where(and(
+                eq(providerPracticeLocations.providerId, providerId),
+                inArray(providerPracticeLocations.practiceLocationId, locationIds)
+            )).execute();
+        const existingLocationIds = new Set(existing.map(r => r.practiceLocationId));
+        const newLocations = locationIds.filter(id => !existingLocationIds.has(id));
+        if (newLocations.length > 0) {
+            await db.insert(providerPracticeLocations).values(
+                newLocations.map(locationId => ({
                     providerId,
                     practiceLocationId: locationId,
                     isPrimary: 0
-                }).execute();
-            }
+                }))
+            ).execute();
         }
     } catch (ex) {
         throw new Error('Error updating provider practice locations.');
