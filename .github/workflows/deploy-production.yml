@@ -21,7 +21,7 @@ jobs:
           echo "${{ secrets.PRODUCTION_DEPLOY_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           chmod 700 ~/.ssh
-          ssh-keyscan -p 12345 -H ${{ secrets.PRODUCTION_SERVER_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ secrets.PRODUCTION_SERVER_HOST }} >> ~/.ssh/known_hosts
 
       - name: Deploy to server
         run: |
