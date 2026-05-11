@@ -1,6 +1,6 @@
 import { initDb } from "../db/client.js";
 import { practices, practiceLocations, locations, providerPracticeLocations, providers, statuses, actions, followUpReasons, ehrSystems, pmSystems, userFavorites } from "../db/schema.js";
-import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and, notExists, notInArray } from 'drizzle-orm';
+import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and, notExists, notInArray, SQL, or } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 import { SearchResponseModel } from "./providers.js";
 
@@ -60,10 +60,7 @@ export type SearchParams = {
     followUpReasonIds?: number[];
     ehrSystemIds?: number[];
     pmSystemIds?: number[];
-    address?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
+    locations?: string;
     practiceIds?: string[];
     favoritesOnly?: string;
     sortField: keyof typeof practices.$inferSelect;
@@ -84,6 +81,7 @@ export type SearchResponse = {
     followUpReason: string | null;
     ehrSystem: string | null;
     pmSystem: string | null;
+    locations: string[] | null;
 };
 
 export async function search(params: SearchParams): Promise<SearchResponseModel<SearchResponse>> {
@@ -98,10 +96,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         followUpReasonIds, 
         ehrSystemIds, 
         pmSystemIds,
-        address,
-        city,
-        state,
-        zip,
+        locations: pLocations,
         practiceIds,
         sortField = 'name', 
         sortDir = 'asc', 
@@ -125,7 +120,8 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         ehrSystemId: practices.ehrSystemId,
         ehrSystem: ehrSystems.systemName,
         pmSystemId: practices.pmSystemId,
-        pmSystem: pmSystems.systemName
+        pmSystem: pmSystems.systemName,
+        locations: sql`group_concat(distinct concat(${locations.city}, ', ',  ${locations.state}) SEPARATOR '|')` as SQL<string>
     }).from(practices)
         .leftJoin(statuses, eq(practices.statusId, statuses.id))
         .leftJoin(actions, eq(practices.actionId, actions.id))
@@ -167,10 +163,13 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     if (npi) whereConditions.push(like(practices.npi, `%${npi}%`));
     if (name) whereConditions.push(like(practices.name, `%${name}%`));
     if (specialization) whereConditions.push(like(practices.specialization, `%${specialization}%`));
-    if (address) whereConditions.push(like(locations.address1, address)), whereConditions.push(like(locations.address2, address));
-    if (city) whereConditions.push(like(locations.city, city));
-    if (state) whereConditions.push(eq(locations.state, state));
-    if (zip) whereConditions.push(like(locations.zip, zip));
+    if (pLocations) {
+        const locs = pLocations.split(' ').map(l => l.trim());
+        const locConditions = [];
+        locConditions.push(...locs.map((loc => like(locations.city, `%${loc}%`))));
+        locConditions.push(...locs.map((loc => like(locations.state, `%${loc}%`))));
+        whereConditions.push(or(...locConditions));
+    }
     // Arrays
     if (statusIds) whereConditions.push(inArray(practices.statusId, statusIds));
     if (actionIds) whereConditions.push(inArray(practices.actionId, actionIds));
@@ -198,6 +197,8 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     query.where(and(...whereConditions));
     countQuery.where(and(...whereConditions));
 
+    query.groupBy(practices.id);
+
     // Apply sorting
     query.orderBy(sortDir === 'asc' ? asc(practices[sortField]) : desc(practices[sortField]));
 
@@ -224,7 +225,8 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
                 followUpDate: practice.followUpDate,
                 followUpReason: practice.followUpReason,
                 ehrSystem: practice.ehrSystem,
-                pmSystem: practice.pmSystem
+                pmSystem: practice.pmSystem,
+                locations: practice.locations ? Array.from(new Set(practice.locations.split('|').map((loc: string) => loc.trim()))) : null
             });
         }
     })
