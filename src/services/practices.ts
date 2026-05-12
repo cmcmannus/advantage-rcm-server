@@ -81,7 +81,9 @@ export type SearchResponse = {
     followUpReason: string | null;
     ehrSystem: string | null;
     pmSystem: string | null;
-    locations: string[] | null;
+    locations?: string[] | null;
+    cities?: string[] | null;
+    states?: string[] | null;
 };
 
 export async function search(params: SearchParams): Promise<SearchResponseModel<SearchResponse>> {
@@ -215,6 +217,12 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     
     results.forEach(practice => {
         if (practice) {
+            const cities: string[] = [], states: string[] = [];
+            practice.locations?.split('|').forEach((loc: string) => {
+                const [city, state] = loc.split(',').map((s: string) => s.trim());
+                if (city) cities.push(city);
+                if (state) states.push(state);
+            });
             response.push({
                 id: practice.id,
                 npi: practice.npi,
@@ -226,7 +234,9 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
                 followUpReason: practice.followUpReason,
                 ehrSystem: practice.ehrSystem,
                 pmSystem: practice.pmSystem,
-                locations: practice.locations ? Array.from(new Set(practice.locations.split('|').map((loc: string) => loc.trim()))) : null
+                cities,
+                states
+                // locations: practice.locations ? Array.from(new Set(practice.locations.split('|').map((loc: string) => loc.trim()))) : null
             });
         }
     })

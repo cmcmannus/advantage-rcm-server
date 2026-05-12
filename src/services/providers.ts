@@ -104,7 +104,9 @@ export type SearchModel = {
     action: string | null;
     followUpDate: Date | null;
     followUpReason: string | null;
-    locations: string[] | null;
+    // locations: string[] | null;
+    cities: string[] | null;
+    states: string[] | null;
 }
 
 export async function search(params: SearchParams): Promise<SearchResponseModel<SearchModel>> {
@@ -151,7 +153,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         .leftJoin(actions, eq(actions.id, providers.actionId))
         .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
         .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
-        .leftJoin(practiceLocations, eq(practiceLocations.practiceId, providerPracticeLocations.providerId))
+        .leftJoin(practiceLocations, eq(practiceLocations.id, providerPracticeLocations.practiceLocationId))
         .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
         .$dynamic();
 
@@ -163,7 +165,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         .leftJoin(actions, eq(actions.id, providers.actionId))
         .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
         .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
-        .leftJoin(practiceLocations, eq(practiceLocations.practiceId, providerPracticeLocations.providerId))
+        .leftJoin(practiceLocations, eq(practiceLocations.id, providerPracticeLocations.practiceLocationId))
         .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
 
     if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
@@ -227,6 +229,15 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     const results = await query.execute();
 
     const response = results.map(item => {
+        const cities: string[] = [], states: string[] = [];
+        if (item.locations) {
+            const locs = item.locations.split('|');
+            locs.forEach((loc: string) => {
+                const [city, state] = loc.split(',').map((s: string) => s.trim());
+                if (city) cities.push(city);
+                if (state) states.push(state);
+            });
+        }
         return {
             id: item.id,
             npi: item.npi,
@@ -240,7 +251,9 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
             action: item.action,
             followUpDate: item.followUpDate,
             followUpReason: item.followUpReason,
-            locations: item.locations ? Array.from(new Set(item.locations.split('|').map((loc: string) => loc.trim()))) : null
+            // locations: item.locations ? Array.from(new Set(item.locations.split('|').map((loc: string) => loc.trim()))) : null
+            cities,
+            states
         }
     })
 
