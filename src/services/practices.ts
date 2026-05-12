@@ -61,9 +61,11 @@ export type SearchParams = {
     ehrSystemIds?: number[];
     pmSystemIds?: number[];
     locations?: string;
+    cities?: string;
+    states?: string;
     practiceIds?: string[];
     favoritesOnly?: string;
-    sortField: keyof typeof practices.$inferSelect;
+    sortField: keyof typeof practices.$inferSelect | 'locations' | 'cities' | 'states';
     sortDir: string;
     pageSize?: number;
     pageNumber?: number;
@@ -99,6 +101,8 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         ehrSystemIds, 
         pmSystemIds,
         locations: pLocations,
+        cities,
+        states,
         practiceIds,
         sortField = 'name', 
         sortDir = 'asc', 
@@ -171,6 +175,11 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         locConditions.push(...locs.map((loc => like(locations.city, `%${loc}%`))));
         locConditions.push(...locs.map((loc => like(locations.state, `%${loc}%`))));
         whereConditions.push(or(...locConditions));
+    } else if (cities || states) {
+        const locConditions = [];
+        if (cities) locConditions.push(...cities.split(' ').map(c => like(locations.city, `%${c.trim()}%`)));
+        if (states) locConditions.push(...states.split(' ').map(s => like(locations.state, `%${s.trim()}%`)));
+        whereConditions.push(or(...locConditions));
     }
     // Arrays
     if (statusIds) whereConditions.push(inArray(practices.statusId, statusIds));
@@ -202,7 +211,25 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     query.groupBy(practices.id);
 
     // Apply sorting
-    query.orderBy(sortDir === 'asc' ? asc(practices[sortField]) : desc(practices[sortField]));
+
+    const locationSortFields = ['locations', 'cities', 'states'];
+
+    if (sortField && locationSortFields.includes(sortField)) {
+        if (sortField === 'locations') {
+            const expr = sql`MIN(CONCAT(${locations.state}, ', ', ${locations.city}))`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'cities') {
+            const expr = sql`MIN(${locations.city})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'states') {
+            const expr = sql`MIN(${locations.state})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        }
+    } else {
+        // normal provider field sorting
+        const col = practices[sortField as keyof typeof practices.$inferSelect];
+        query.orderBy(sortDir === 'asc' ? asc(col) : desc(col));
+    } 
 
     // Apply paging
     if (pageSize > 0) {

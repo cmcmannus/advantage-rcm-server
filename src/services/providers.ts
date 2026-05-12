@@ -26,7 +26,9 @@ export type SearchParams = {
     ehrSystemIds?: number[];
     pmSystemIds?: number[];
     locations?: string;
-    sortField?: keyof typeof providers.$inferSelect | "locations";
+    cities?: string;
+    states?: string;
+    sortField?: keyof typeof providers.$inferSelect | "locations" | "cities" | "states";
     sortDir?: string;
     pageSize?: number;
     pageNumber?: number;
@@ -124,6 +126,8 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         followUpOperator,
         followUpReasonIds,
         locations: pLocations,
+        cities,
+        states,
         sortField = 'followUpDate',
         sortDir = 'asc',
         providerIds,
@@ -203,6 +207,11 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         locConditions.push(...locs.map((loc => like(locations.city, `%${loc}%`))));
         locConditions.push(...locs.map((loc => like(locations.state, `%${loc}%`))));
         whereConditions.push(or(...locConditions));
+    } else if (cities || states) {
+        const locConditions = [];
+        if (cities) locConditions.push(...cities.split(' ').map(c => like(locations.city, `%${c.trim()}%`)));
+        if (states) locConditions.push(...states.split(' ').map(s => like(locations.state, `%${s.trim()}%`)));
+        whereConditions.push(or(...locConditions));
     }
     if (providerIds && providerIds.length > 0) whereConditions.push(inArray(providers.id, providerIds));
     if (adminName) whereConditions.push(like(providers.adminName, `%${adminName}%`));
@@ -213,13 +222,24 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     query.groupBy(providers.id);
 
     // Apply sorting
-    if (sortField && (sortField === 'locations')) {
-        if (sortDir === 'asc') query.orderBy(asc(locations.state), asc(locations.city));
-        else query.orderBy(desc(locations.state), desc(locations.city));
-    } else if (sortField) {
-        if (sortDir === 'asc') query.orderBy(asc(providers[sortField]));
-        else query.orderBy(desc(providers[sortField]));
-    }    
+    const locationSortFields = ['locations', 'cities', 'states'];
+
+    if (sortField && locationSortFields.includes(sortField)) {
+        if (sortField === 'locations') {
+            const expr = sql`MIN(CONCAT(${locations.state}, ', ', ${locations.city}))`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'cities') {
+            const expr = sql`MIN(${locations.city})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'states') {
+            const expr = sql`MIN(${locations.state})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        }
+    } else {
+        // normal provider field sorting
+        const col = providers[sortField as keyof typeof providers.$inferSelect];
+        query.orderBy(sortDir === 'asc' ? asc(col) : desc(col));
+    }   
 
     // Apply pagination
     if (pageSize > 0) query.limit(pageSize).offset((pageNumber - 1) * pageSize);
