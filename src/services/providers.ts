@@ -1,6 +1,6 @@
 import { initDb } from "../db/client.js";
 import { providers, practices, practiceLocations, locations, providerPracticeLocations, users, statuses, actions, followUpReasons, userFavorites } from "../db/schema.js";
-import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count, is } from 'drizzle-orm';
+import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count, is, or } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 
 const db = initDb();
@@ -25,11 +25,10 @@ export type SearchParams = {
     followUpReasonIds?: number[];
     ehrSystemIds?: number[];
     pmSystemIds?: number[];
-    address?: string;
-    city?: string;
-    state?: string;
-    zip?: string;
-    sortField?: keyof typeof providers.$inferSelect;
+    locations?: string;
+    cities?: string;
+    states?: string;
+    sortField?: keyof typeof providers.$inferSelect | "locations" | "cities" | "states";
     sortDir?: string;
     pageSize?: number;
     pageNumber?: number;
@@ -107,10 +106,9 @@ export type SearchModel = {
     action: string | null;
     followUpDate: Date | null;
     followUpReason: string | null;
-    // address: string | null;
-    // city: string | null;
-    // state: string | null;
-    // zip: string | null;
+    // locations: string[] | null;
+    cities: string[] | null;
+    states: string[] | null;
 }
 
 export async function search(params: SearchParams): Promise<SearchResponseModel<SearchModel>> {
@@ -127,6 +125,9 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         followUpDate,
         followUpOperator,
         followUpReasonIds,
+        locations: pLocations,
+        cities,
+        states,
         sortField = 'followUpDate',
         sortDir = 'asc',
         providerIds,
@@ -136,7 +137,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     const pageSize = params.pageSize ? Number(params.pageSize) : 50;
     const pageNumber = params.pageNumber ? Number(params.pageNumber) : 1;
 
-    const query = db.select({
+    const query = db.selectDistinct({
         id: providers.id,
         npi: providers.npi,
         firstName: providers.firstName,
@@ -149,18 +150,15 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         action: actions.action,
         followUpDate: providers.followUpDate,
         followUpReason: followUpReasons.reason,
-        // address: (sql`CONCAT(${locations.address1}, ' ', ${locations.address2})`) as SQL<string>, // Combine address1 and address2
-        // city: locations.city,
-        // state: locations.state,
-        // zip: locations.zip,
+        locations: sql`group_concat(distinct concat(${locations.city}, ', ',  ${locations.state}) SEPARATOR '|')` as SQL<string>
     }).from(providers)
         .leftJoin(users, eq(users.id, providers.salesRepId))
         .leftJoin(statuses, eq(statuses.id, providers.statusId))
         .leftJoin(actions, eq(actions.id, providers.actionId))
         .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
-        // .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
-        // .leftJoin(practiceLocations, eq(practiceLocations.practiceId, providerPracticeLocations.providerId))
-        // .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
+        .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
+        .leftJoin(practiceLocations, eq(practiceLocations.id, providerPracticeLocations.practiceLocationId))
+        .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
         .$dynamic();
 
     const countQuery = db.select({
@@ -170,9 +168,9 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         .leftJoin(statuses, eq(statuses.id, providers.statusId))
         .leftJoin(actions, eq(actions.id, providers.actionId))
         .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
-        // .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
-        // .leftJoin(practiceLocations, eq(practiceLocations.practiceId, providerPracticeLocations.providerId))
-    // .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
+        .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
+        .leftJoin(practiceLocations, eq(practiceLocations.id, providerPracticeLocations.practiceLocationId))
+        .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
 
     if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
         query.innerJoin(userFavorites, and(
@@ -203,27 +201,81 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         whereConditions.push(operator(providers.followUpDate, followUpDate));
     }
     if (followUpReasonIds && followUpReasonIds.length > 0) whereConditions.push(inArray(providers.followUpReasonId, followUpReasonIds));
-    // if (address) {
-    //     whereConditions.push(like(locations.address1, `%${address}%`));
-    //     whereConditions.push(like(locations.address2, `%${address}%`));
-    // }
-    // if (city) whereConditions.push(like(locations.city, `%${city}%`));
-    // if (state) whereConditions.push(eq(locations.state, state));
-    // if (zip) whereConditions.push(like(locations.zip, `%${zip}%`));
+    if (pLocations) {
+        const locs = pLocations.split(' ').map(l => l.trim());
+        const locConditions = [];
+        locConditions.push(...locs.map((loc => like(locations.city, `%${loc}%`))));
+        locConditions.push(...locs.map((loc => like(locations.state, `%${loc}%`))));
+        whereConditions.push(or(...locConditions));
+    } else if (cities || states) {
+        const locConditions = [];
+        if (cities) locConditions.push(...cities.split(' ').map(c => like(locations.city, `%${c.trim()}%`)));
+        if (states) locConditions.push(...states.split(' ').map(s => like(locations.state, `%${s.trim()}%`)));
+        whereConditions.push(or(...locConditions));
+    }
     if (providerIds && providerIds.length > 0) whereConditions.push(inArray(providers.id, providerIds));
     if (adminName) whereConditions.push(like(providers.adminName, `%${adminName}%`));
 
     query.where(and(...whereConditions));
     countQuery.where(and(...whereConditions));
 
+    query.groupBy(providers.id);
+
     // Apply sorting
-    if (sortDir === 'asc') query.orderBy(asc(providers[sortField]));
-    else query.orderBy(desc(providers[sortField]));
+    const locationSortFields = ['locations', 'cities', 'states'];
+
+    if (sortField && locationSortFields.includes(sortField)) {
+        if (sortField === 'locations') {
+            const expr = sql`MIN(CONCAT(${locations.state}, ', ', ${locations.city}))`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'cities') {
+            const expr = sql`MIN(${locations.city})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'states') {
+            const expr = sql`MIN(${locations.state})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        }
+    } else {
+        // normal provider field sorting
+        const col = providers[sortField as keyof typeof providers.$inferSelect];
+        query.orderBy(sortDir === 'asc' ? asc(col) : desc(col));
+    }   
 
     // Apply pagination
     if (pageSize > 0) query.limit(pageSize).offset((pageNumber - 1) * pageSize);
 
     const totalRecords: number = (await countQuery.execute())[0].count;
+
+    const results = await query.execute();
+
+    const response = results.map(item => {
+        const cities: string[] = [], states: string[] = [];
+        if (item.locations) {
+            const locs = item.locations.split('|');
+            locs.forEach((loc: string) => {
+                const [city, state] = loc.split(',').map((s: string) => s.trim());
+                if (city) cities.push(city);
+                if (state) states.push(state);
+            });
+        }
+        return {
+            id: item.id,
+            npi: item.npi,
+            firstName: item.firstName,
+            middleName: item.middleName,
+            lastName: item.lastName,
+            directEmail: item.directEmail,
+            specialization: item.specialization,
+            salesRep: item.salesRep,
+            status: item.status,
+            action: item.action,
+            followUpDate: item.followUpDate,
+            followUpReason: item.followUpReason,
+            // locations: item.locations ? Array.from(new Set(item.locations.split('|').map((loc: string) => loc.trim()))) : null
+            cities,
+            states
+        }
+    })
 
     const resp = {
         paging: {
@@ -231,7 +283,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
             pageSize,
             totalPages: totalRecords % pageSize === 0 ? (totalRecords / pageSize) : Math.floor(totalRecords / pageSize) + 1,
         },
-        data: await query.execute()
+        data: response
     };
 
     return resp;
