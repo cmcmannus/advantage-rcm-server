@@ -410,10 +410,22 @@ export async function getProviderPractices(params: ProviderPracticesSearchParams
 
 export async function getProviderFilterOptions() {
     const [statusesData, actionsData, followUpReasonsData, salesRepsData, specializationsData, statesData] = await Promise.all([
-        db.select().from(statuses).execute(),
-        db.select().from(actions).execute(),
-        db.select().from(followUpReasons).execute(),
-        db.select({ id: users.id, name: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})` }).from(users).execute(),
+        db.select({
+            value: statuses.id,
+            label: statuses.status
+        }).from(statuses).execute(),
+        db.select({
+            value: actions.id,
+            label: actions.action
+        }).from(actions).execute(),
+        db.select({
+            value: followUpReasons.id,
+            label: followUpReasons.reason
+        }).from(followUpReasons).execute(),
+        db.select({ 
+            value: users.id, 
+            label: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})` 
+        }).from(users).execute(),
         db.selectDistinct({
                 value: providers.specialization,
                 label: providers.specialization
@@ -422,7 +434,10 @@ export async function getProviderFilterOptions() {
                 sql`${providers.specialization} IS NOT NULL`,
                 sql`${providers.specialization} != ''`))
             .orderBy(asc(providers.specialization)),
-        db.selectDistinct({value: locations.state, label: locations.state}).from(locations).orderBy(asc(locations.state))
+        db.selectDistinct({
+            value: locations.state, 
+            label: locations.state
+        }).from(locations).orderBy(asc(locations.state))
     ]);
 
     return {
