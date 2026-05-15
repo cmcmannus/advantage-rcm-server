@@ -53,19 +53,19 @@ export type SearchParams = {
     npi?: string;
     name?: string;
     specialization?: string;
-    statusIds?: number[];
-    actionIds?: number[];
-    followUpDate?: Date;
+    status?: string;
+    action?: string;
+    followUpDate?: Date | string;
     followUpOperator?: string;
-    followUpReasonIds?: number[];
-    ehrSystemIds?: number[];
-    pmSystemIds?: number[];
+    followUpReason?: string;
+    ehrSystem?: string;
+    pmSystem?: string;
     locations?: string;
     cities?: string;
     states?: string;
     practiceIds?: string[];
     favoritesOnly?: string;
-    sortField: keyof typeof practices.$inferSelect | 'locations' | 'cities' | 'states';
+    sortField: keyof typeof practices.$inferSelect | 'cities' | 'states';
     sortDir: string;
     pageSize?: number;
     pageNumber?: number;
@@ -93,14 +93,13 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         npi, 
         name, 
         specialization, 
-        statusIds, 
-        actionIds, 
+        status,
+        action,
         followUpDate, 
         followUpOperator, 
-        followUpReasonIds, 
-        ehrSystemIds, 
-        pmSystemIds,
-        locations: pLocations,
+        followUpReason,
+        ehrSystem,
+        pmSystem,
         cities,
         states,
         practiceIds,
@@ -168,28 +167,39 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     // Strings
     if (npi) whereConditions.push(like(practices.npi, `%${npi}%`));
     if (name) whereConditions.push(like(practices.name, `%${name}%`));
-    if (specialization) whereConditions.push(like(practices.specialization, `%${specialization}%`));
-    if (pLocations) {
-        const locs = pLocations.split(' ').map(l => l.trim());
+    if (cities || states) {
         const locConditions = [];
-        locConditions.push(...locs.map((loc => like(locations.city, `%${loc}%`))));
-        locConditions.push(...locs.map((loc => like(locations.state, `%${loc}%`))));
-        whereConditions.push(or(...locConditions));
-    } else if (cities || states) {
-        const locConditions = [];
-        if (cities) locConditions.push(...cities.split(' ').map(c => like(locations.city, `%${c.trim()}%`)));
-        if (states) locConditions.push(...states.split(' ').map(s => like(locations.state, `%${s.trim()}%`)));
+        if (cities) locConditions.push(...cities.split(',').map(c => like(locations.city, `%${c.trim()}%`)));
+        if (states) locConditions.push(...states.split(',').map(s => like(locations.state, `%${s.trim()}%`)));
         whereConditions.push(or(...locConditions));
     }
-    // Arrays
-    if (statusIds) whereConditions.push(inArray(practices.statusId, statusIds));
-    if (actionIds) whereConditions.push(inArray(practices.actionId, actionIds));
-    if (followUpReasonIds) whereConditions.push(inArray(practices.followUpReasonId, followUpReasonIds));
-    if (ehrSystemIds) whereConditions.push(inArray(practices.ehrSystemId, ehrSystemIds));
-    if (pmSystemIds) whereConditions.push(inArray(practices.pmSystemId, pmSystemIds));
+    // Multi-select filter params (comma-separated ID strings)
+    const statusIds = status
+        ? status.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const actionIds = action
+        ? action.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const followUpReasonIds = followUpReason
+        ? followUpReason.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const ehrSystemIds = ehrSystem
+        ? ehrSystem.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const pmSystemIds = pmSystem
+        ? pmSystem.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const specializations = specialization ? specialization.split(',').map(s => s.trim()) : [];
+
+    if (statusIds.length > 0) whereConditions.push(inArray(practices.statusId, statusIds));
+    if (actionIds.length > 0) whereConditions.push(inArray(practices.actionId, actionIds));
+    if (followUpReasonIds.length > 0) whereConditions.push(inArray(practices.followUpReasonId, followUpReasonIds));
+    if (ehrSystemIds.length > 0) whereConditions.push(inArray(practices.ehrSystemId, ehrSystemIds));
+    if (pmSystemIds.length > 0) whereConditions.push(inArray(practices.pmSystemId, pmSystemIds));
     if (practiceIds) whereConditions.push(inArray(practices.id, practiceIds.map(id => Number(id))));
+    if (specializations.length > 0) whereConditions.push(or(...specializations.map(s => eq(practices.specialization, s))));
     // Dates
-    if (followUpDate && followUpOperator) {
+    if (followUpDate && followUpOperator && followUpDate instanceof Date) {
         let operator: BinaryOperator = eq;
         switch (followUpOperator) {
             case 'lt':
@@ -203,6 +213,18 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
                 break;
         }
         whereConditions.push(operator(practices.followUpDate, followUpDate))
+    } else if (followUpDate && typeof followUpDate === 'string') {
+        const parts = followUpDate.split(':');
+        const mode = parts[0];
+        if (mode === 'after') {
+            whereConditions.push(gt(practices.followUpDate, new Date(parts[1])));
+        } else if (mode === 'before') {
+            whereConditions.push(lt(practices.followUpDate, new Date(parts[1])));
+        } else if (mode === 'between') {
+            const dates = parts[1].split(',');
+            if (dates[0]) whereConditions.push(gt(practices.followUpDate, new Date(dates[0])));
+            if (dates[1]) whereConditions.push(lt(practices.followUpDate, new Date(dates[1])));
+        }
     }
 
     query.where(and(...whereConditions));
@@ -215,10 +237,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     const locationSortFields = ['locations', 'cities', 'states'];
 
     if (sortField && locationSortFields.includes(sortField)) {
-        if (sortField === 'locations') {
-            const expr = sql`MIN(CONCAT(${locations.state}, ', ', ${locations.city}))`;
-            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
-        } else if (sortField === 'cities') {
+        if (sortField === 'cities') {
             const expr = sql`MIN(${locations.city})`;
             query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
         } else if (sortField === 'states') {
@@ -296,6 +315,61 @@ export async function getPracticesForDdl(query?: string): Promise<{ value: numbe
     .limit(25);
 
     return results;
+}
+
+export async function getPracticeFilterOptions() {
+    const specializations = await db.selectDistinct({
+        value: practices.specialization,
+        label: practices.specialization
+    })
+    .from(practices)
+    .where(and(
+        sql`${practices.specialization} IS NOT NULL`,
+        sql`${practices.specialization} != ''`
+    ))
+    .orderBy(asc(practices.specialization));
+
+    const states = await db.selectDistinct({
+        value: locations.state,
+        label: locations.state
+    })
+    .from(locations)
+    .orderBy(asc(locations.state));
+
+    const statusList = await db.select({
+        value: sql<string>`CAST(${statuses.id} AS CHAR)`,
+        label: statuses.status
+    }).from(statuses);
+
+    const actionList = await db.select({
+        value: sql<string>`CAST(${actions.id} AS CHAR)`,
+        label: actions.action
+    }).from(actions);
+
+    const followUpReasonList = await db.select({
+        value: sql<string>`CAST(${followUpReasons.id} AS CHAR)`,
+        label: followUpReasons.reason
+    }).from(followUpReasons);
+
+    const ehrSystemList = await db.select({
+        value: sql<string>`CAST(${ehrSystems.id} AS CHAR)`,
+        label: ehrSystems.systemName
+    }).from(ehrSystems);
+
+    const pmSystemList = await db.select({
+        value: sql<string>`CAST(${pmSystems.id} AS CHAR)`,
+        label: pmSystems.systemName
+    }).from(pmSystems);
+
+    return {
+        specializations: specializations.filter(s => s.value !== null),
+        states,
+        statuses: statusList,
+        actions: actionList,
+        followUpReasons: followUpReasonList,
+        ehrSystems: ehrSystemList,
+        pmSystems: pmSystemList
+    };
 }
 
 export async function getProvidersAvailableForPractice(practiceId: number, providerName?: string): Promise<{ value: number; label: string }[]> {
