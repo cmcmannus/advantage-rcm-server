@@ -4,6 +4,7 @@ import {
     updateProvider,
     deleteProvider,
     getProviderPractices,
+    getProviderFilterOptions,
     search,
     getProvider,
     InsertModel,
@@ -72,6 +73,16 @@ router.get('/', async (req, res, next) => {
         }
         const results = await search(params);
         res.send(results);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Get filter options for provider table columns
+router.get('/filter-options', async (req, res, next) => {
+    try {
+        const options = await getProviderFilterOptions();
+        res.send(options);
     } catch (err) {
         next(err);
     }

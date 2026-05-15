@@ -4,6 +4,7 @@ import {
     updatePractice,
     deletePractice,
     getPracticesForDdl,
+    getPracticeFilterOptions,
     search,
     getPractice,
     getPracticeProviders,
@@ -80,6 +81,16 @@ router.get('/ddl', async (req, res, next) => {
         const query = req.query.q as string | undefined;
         const ddlPractices = await getPracticesForDdl(query);
         res.send(ddlPractices);
+    } catch (err) {
+        next(err);
+    }
+});
+
+// Get filter options for practice table columns
+router.get('/filter-options', async (req, res, next) => {
+    try {
+        const options = await getPracticeFilterOptions();
+        res.send(options);
     } catch (err) {
         next(err);
     }
