@@ -32,9 +32,8 @@ jobs:
             git fetch --all
             git reset --hard origin/staging
 
-            # Install deps & build static site
+            # Install deps & build server
             npm install
             npm run build
-            pkill node
-            nohup npm run start 2>&1 &
+            pm2 reload advrcm-server --watch
           EOF
