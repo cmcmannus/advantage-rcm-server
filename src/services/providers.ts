@@ -1,6 +1,6 @@
 import { initDb } from "../db/client.js";
 import { providers, practices, practiceLocations, locations, providerPracticeLocations, users, statuses, actions, followUpReasons, userFavorites } from "../db/schema.js";
-import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count, is, or } from 'drizzle-orm';
+import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count, is, or, BinaryOperator } from 'drizzle-orm';
 import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 
 const db = initDb();
@@ -9,33 +9,6 @@ type ProvidersType = typeof providers;
 export type InsertModel = InferInsertModel<ProvidersType>;
 export type SelectModel = InferSelectModel<ProvidersType> & {
     favorite?: boolean;
-};
-export type SearchParams = {
-    npi?: string;
-    firstName: string;
-    middleName: string;
-    lastName: string;
-    directEmail: string;
-    specialization?: string;
-    salesRepId: number,
-    statusIds?: number[];
-    actionIds?: number[];
-    followUpDate?: Date;
-    followUpOperator?: string;
-    followUpReasonIds?: number[];
-    ehrSystemIds?: number[];
-    pmSystemIds?: number[];
-    locations?: string;
-    cities?: string;
-    states?: string;
-    sortField?: keyof typeof providers.$inferSelect | "locations" | "cities" | "states";
-    sortDir?: string;
-    pageSize?: number;
-    pageNumber?: number;
-    providerIds: number[] | null;
-    adminName?: string;
-    favoritesOnly?: string;
-    userId?: number;
 };
 
 export async function createProvider(payload: InsertModel): Promise<SelectModel> {
@@ -92,6 +65,30 @@ export type SearchResponseModel<T> = {
     }
     data: T[];
 }
+export type SearchParams = {
+    npi?: string;
+    firstName: string;
+    middleName: string;
+    lastName: string;
+    directEmail: string;
+    specializations?: string;
+    status?: string;
+    action?: string;
+    followUpReason?: string;
+    followUpDate?: Date | string;
+    followUpOperator?: string;
+    salesRep?: string;
+    cities?: string;
+    states?: string;
+    sortField?: keyof typeof providers.$inferSelect | "cities" | "states";
+    sortDir?: string;
+    pageSize?: number;
+    pageNumber?: number;
+    providerIds: number[] | null;
+    adminName?: string;
+    favoritesOnly?: string;
+    userId?: number;
+};
 
 export type SearchModel = {
     id: number;
@@ -118,14 +115,13 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         middleName,
         lastName,
         directEmail,
-        specialization,
-        salesRepId,
-        statusIds,
-        actionIds,
+        specializations: pSpecializations,
+        salesRep: pSalesReps,
+        status: pStatuses,
+        action: pActions,
         followUpDate,
         followUpOperator,
-        followUpReasonIds,
-        locations: pLocations,
+        followUpReason: pFollowUpReasons,
         cities,
         states,
         sortField = 'followUpDate',
@@ -192,25 +188,58 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     if (middleName) whereConditions.push(like(providers.middleName, `%${middleName}%`));
     if (lastName) whereConditions.push(like(providers.lastName, `%${lastName}%`));
     if (directEmail) whereConditions.push(like(providers.directEmail, `%${directEmail}%`));
-    if (specialization) whereConditions.push(like(providers.specialization, `%${specialization}%`));
-    if (salesRepId) whereConditions.push(eq(providers.salesRepId, salesRepId));
-    if (statusIds && statusIds.length > 0) whereConditions.push(inArray(providers.statusId, statusIds));
-    if (actionIds && actionIds.length > 0) whereConditions.push(inArray(providers.actionId, actionIds));
-    if (followUpDate && followUpOperator) {
-        const operator = followUpOperator === '>' ? gt : followUpOperator === '<' ? lt : eq;
-        whereConditions.push(operator(providers.followUpDate, followUpDate));
-    }
-    if (followUpReasonIds && followUpReasonIds.length > 0) whereConditions.push(inArray(providers.followUpReasonId, followUpReasonIds));
-    if (pLocations) {
-        const locs = pLocations.split(' ').map(l => l.trim());
+    // Multi-select filter params (comma-separated ID strings)
+        const statusIds = pStatuses
+            ? pStatuses.split(',').map(Number).filter(n => !isNaN(n))
+            : [];
+        const actionIds = pActions
+            ? pActions.split(',').map(Number).filter(n => !isNaN(n))
+            : [];
+        const followUpReasonIds = pFollowUpReasons
+            ? pFollowUpReasons.split(',').map(Number).filter(n => !isNaN(n))
+            : [];
+        const specializations = pSpecializations ? pSpecializations.split(',').map(s => s.trim()).filter(s => s.length > 0) : [];
+        const salesRepIds = pSalesReps
+            ? pSalesReps.split(',').map(Number).filter(n => !isNaN(n))
+            : [];
+    
+        if (statusIds.length > 0) whereConditions.push(inArray(practices.statusId, statusIds));
+        if (actionIds.length > 0) whereConditions.push(inArray(practices.actionId, actionIds));
+        if (followUpReasonIds.length > 0) whereConditions.push(inArray(practices.followUpReasonId, followUpReasonIds));
+        if (specializations.length > 0) whereConditions.push(or(...specializations.map(s => eq(providers.specialization, s))));
+        if (salesRepIds.length > 0) whereConditions.push(inArray(users.id, salesRepIds));
+        // Dates
+        if (followUpDate && followUpOperator && followUpDate instanceof Date) {
+            let operator: BinaryOperator = eq;
+            switch (followUpOperator) {
+                case 'lt':
+                    operator = lt;
+                    break;
+                case 'eq':
+                    operator = eq;
+                    break;
+                case 'gt':
+                    operator = gt;
+                    break;
+            }
+            whereConditions.push(operator(practices.followUpDate, followUpDate))
+        } else if (followUpDate && typeof followUpDate === 'string') {
+            const parts = followUpDate.split(':');
+            const mode = parts[0];
+            if (mode === 'after') {
+                whereConditions.push(gt(practices.followUpDate, new Date(parts[1])));
+            } else if (mode === 'before') {
+                whereConditions.push(lt(practices.followUpDate, new Date(parts[1])));
+            } else if (mode === 'between') {
+                const dates = parts[1].split(',');
+                if (dates[0]) whereConditions.push(gt(practices.followUpDate, new Date(dates[0])));
+                if (dates[1]) whereConditions.push(lt(practices.followUpDate, new Date(dates[1])));
+            }
+        }
+    if (cities || states) {
         const locConditions = [];
-        locConditions.push(...locs.map((loc => like(locations.city, `%${loc}%`))));
-        locConditions.push(...locs.map((loc => like(locations.state, `%${loc}%`))));
-        whereConditions.push(or(...locConditions));
-    } else if (cities || states) {
-        const locConditions = [];
-        if (cities) locConditions.push(...cities.split(' ').map(c => like(locations.city, `%${c.trim()}%`)));
-        if (states) locConditions.push(...states.split(' ').map(s => like(locations.state, `%${s.trim()}%`)));
+        if (cities) locConditions.push(...cities.split(',').map(c => like(locations.city, `%${c.trim()}%`)));
+        if (states) locConditions.push(...states.split(',').map(s => like(locations.state, `%${s.trim()}%`)));
         whereConditions.push(or(...locConditions));
     }
     if (providerIds && providerIds.length > 0) whereConditions.push(inArray(providers.id, providerIds));
@@ -225,10 +254,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     const locationSortFields = ['locations', 'cities', 'states'];
 
     if (sortField && locationSortFields.includes(sortField)) {
-        if (sortField === 'locations') {
-            const expr = sql`MIN(CONCAT(${locations.state}, ', ', ${locations.city}))`;
-            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
-        } else if (sortField === 'cities') {
+        if (sortField === 'cities') {
             const expr = sql`MIN(${locations.city})`;
             query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
         } else if (sortField === 'states') {
@@ -380,4 +406,46 @@ export async function getProviderPractices(params: ProviderPracticesSearchParams
         },
         data: results
     };
+}
+
+export async function getProviderFilterOptions() {
+    const [statusesData, actionsData, followUpReasonsData, salesRepsData, specializationsData, statesData] = await Promise.all([
+        db.select({
+            value: statuses.id,
+            label: statuses.status
+        }).from(statuses).execute(),
+        db.select({
+            value: actions.id,
+            label: actions.action
+        }).from(actions).execute(),
+        db.select({
+            value: followUpReasons.id,
+            label: followUpReasons.reason
+        }).from(followUpReasons).execute(),
+        db.select({ 
+            value: users.id, 
+            label: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})` 
+        }).from(users).execute(),
+        db.selectDistinct({
+                value: providers.specialization,
+                label: providers.specialization
+            }).from(providers)
+            .where(and(
+                sql`${providers.specialization} IS NOT NULL`,
+                sql`${providers.specialization} != ''`))
+            .orderBy(asc(providers.specialization)),
+        db.selectDistinct({
+            value: locations.state, 
+            label: locations.state
+        }).from(locations).orderBy(asc(locations.state))
+    ]);
+
+    return {
+        statuses: statusesData,
+        actions: actionsData,
+        followUpReasons: followUpReasonsData,
+        salesReps: salesRepsData,
+        specializations: specializationsData,
+        states: statesData
+    }
 }
