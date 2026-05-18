@@ -1,7 +1,7 @@
+import { MySqlColumn } from "drizzle-orm/mysql-core";
 import { initDb } from "../db/client.js";
 import { providers, practices, practiceLocations, locations, providerPracticeLocations, users, statuses, actions, followUpReasons, userFavorites } from "../db/schema.js";
 import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, and, gt, asc, desc, sql, SQL, count, is, or, BinaryOperator } from 'drizzle-orm';
-import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 
 const db = initDb();
 
@@ -313,6 +313,208 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     };
 
     return resp;
+}
+
+const locationTriggerColumn = 'locations';
+
+export const providerColumnMap: Record<string, any> = {
+    id: providers.id,
+    npi: providers.npi,
+    firstName: providers.firstName,
+    middleName: providers.middleName,
+    lastName: providers.lastName,
+    suffix: providers.suffix,
+    directEmail: providers.directEmail,
+    specialization: providers.specialization,
+    email: providers.email,
+    adminName: providers.adminName,
+    adminEmail: providers.adminEmail,
+    phone: providers.phone,
+    salesRepId: providers.salesRepId,
+    statusId: providers.statusId,
+    actionId: providers.actionId,
+    followUpDate: providers.followUpDate,
+    followUpReasonId: providers.followUpReasonId,
+    status: statuses.status,
+    action: actions.action,
+    followUpReason: followUpReasons.reason,
+    salesRep: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
+    address1: sql`group_concat(distinct ${locations.address1} SEPARATOR '|')`,
+    address2: sql`group_concat(distinct ${locations.address2} SEPARATOR '|')`,
+    city: sql`group_concat(distinct ${locations.city} SEPARATOR '|')`,
+    state: sql`group_concat(distinct ${locations.state} SEPARATOR '|')`,
+    zip: sql`group_concat(distinct ${locations.zip} SEPARATOR '|')`,
+    practiceName: sql`group_concat(distinct ${practices.name} SEPARATOR '|')`,
+};
+
+function expandColumns(columns: string[], isProvider: boolean): string[] {
+    const hasLocation = columns.some(c => c === locationTriggerColumn);
+    if (!hasLocation) return columns;
+
+    const expanded = columns.filter(c => c !== locationTriggerColumn);
+    expanded.push('address1', 'address2', 'city', 'state', 'zip');
+    if (isProvider) expanded.push('practiceName');
+    return expanded;
+}
+
+export type ExportParams = Omit<SearchParams, 'pageSize' | 'pageNumber'> & {
+    columns?: string[];
+};
+
+export async function exportData(params: ExportParams): Promise<{ data: Record<string, any>[]; columns: string[] }> {
+    const {
+        npi,
+        firstName,
+        middleName,
+        lastName,
+        directEmail,
+        specializations: pSpecializations,
+        salesRep: pSalesReps,
+        status: pStatuses,
+        action: pActions,
+        followUpDate,
+        followUpOperator,
+        followUpReason: pFollowUpReasons,
+        cities,
+        states,
+        sortField = 'followUpDate',
+        sortDir = 'asc',
+        providerIds,
+        adminName,
+        columns,
+    } = params;
+
+    const defaultSelect = {
+        id: providers.id,
+        npi: providers.npi,
+        firstName: providers.firstName,
+        middleName: providers.middleName,
+        lastName: providers.lastName,
+        directEmail: providers.directEmail,
+        specialization: providers.specialization,
+        salesRep: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})` as SQL<string>,
+        status: statuses.status,
+        action: actions.action,
+        followUpDate: providers.followUpDate,
+        followUpReason: followUpReasons.reason,
+    };
+
+    const effectiveColumns = columns && columns.length > 0
+        ? expandColumns(columns, true)
+        : undefined;
+
+    const selectColumns = effectiveColumns
+        ? Object.fromEntries(
+            effectiveColumns.filter(col => col in providerColumnMap).map(col => [col, providerColumnMap[col]])
+          )
+        : defaultSelect;
+
+    const query = db.selectDistinct(selectColumns)
+        .from(providers)
+        .leftJoin(users, eq(users.id, providers.salesRepId))
+        .leftJoin(statuses, eq(statuses.id, providers.statusId))
+        .leftJoin(actions, eq(actions.id, providers.actionId))
+        .leftJoin(followUpReasons, eq(followUpReasons.id, providers.followUpReasonId))
+        .leftJoin(providerPracticeLocations, eq(providerPracticeLocations.providerId, providers.id))
+        .leftJoin(practiceLocations, eq(practiceLocations.id, providerPracticeLocations.practiceLocationId))
+        .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
+        .leftJoin(practices, eq(practices.id, practiceLocations.practiceId))
+        .$dynamic();
+
+    if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
+        query.innerJoin(userFavorites, and(
+            eq(userFavorites.userId, params.userId!),
+            eq(userFavorites.providerId, providers.id)
+        ));
+    }
+
+    const whereConditions = [];
+
+    if (npi) whereConditions.push(like(providers.npi, `%${npi}%`));
+    if (firstName) whereConditions.push(like(providers.firstName, `%${firstName}%`));
+    if (middleName) whereConditions.push(like(providers.middleName, `%${middleName}%`));
+    if (lastName) whereConditions.push(like(providers.lastName, `%${lastName}%`));
+    if (directEmail) whereConditions.push(like(providers.directEmail, `%${directEmail}%`));
+
+    const statusIds = pStatuses
+        ? pStatuses.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const actionIds = pActions
+        ? pActions.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const followUpReasonIds = pFollowUpReasons
+        ? pFollowUpReasons.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const specializations = pSpecializations ? pSpecializations.split(',').map(s => s.trim()).filter(s => s.length > 0) : [];
+    const salesRepIds = pSalesReps
+        ? pSalesReps.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+
+    if (statusIds.length > 0) whereConditions.push(inArray(providers.statusId, statusIds));
+    if (actionIds.length > 0) whereConditions.push(inArray(providers.actionId, actionIds));
+    if (followUpReasonIds.length > 0) whereConditions.push(inArray(providers.followUpReasonId, followUpReasonIds));
+    if (specializations.length > 0) whereConditions.push(or(...specializations.map(s => eq(providers.specialization, s))));
+    if (salesRepIds.length > 0) whereConditions.push(inArray(users.id, salesRepIds));
+
+    if (followUpDate && followUpOperator && followUpDate instanceof Date) {
+        let operator: BinaryOperator = eq;
+        switch (followUpOperator) {
+            case 'lt':
+                operator = lt;
+                break;
+            case 'eq':
+                operator = eq;
+                break;
+            case 'gt':
+                operator = gt;
+                break;
+        }
+        whereConditions.push(operator(providers.followUpDate, followUpDate))
+    } else if (followUpDate && typeof followUpDate === 'string') {
+        const parts = followUpDate.split(':');
+        const mode = parts[0];
+        if (mode === 'after') {
+            whereConditions.push(gt(providers.followUpDate, new Date(parts[1])));
+        } else if (mode === 'before') {
+            whereConditions.push(lt(providers.followUpDate, new Date(parts[1])));
+        } else if (mode === 'between') {
+            const dates = parts[1].split(',');
+            if (dates[0]) whereConditions.push(gt(providers.followUpDate, new Date(dates[0])));
+            if (dates[1]) whereConditions.push(lt(providers.followUpDate, new Date(dates[1])));
+        }
+    }
+    if (cities || states) {
+        const locConditions = [];
+        if (cities) locConditions.push(...cities.split(',').map(c => like(locations.city, `%${c.trim()}%`)));
+        if (states) locConditions.push(...states.split(',').map(s => like(locations.state, `%${s.trim()}%`)));
+        whereConditions.push(or(...locConditions));
+    }
+    if (providerIds && providerIds.length > 0) whereConditions.push(inArray(providers.id, providerIds));
+    if (adminName) whereConditions.push(like(providers.adminName, `%${adminName}%`));
+
+    query.where(and(...whereConditions));
+    query.groupBy(providers.id);
+
+    const locationSortFields = ['locations', 'cities', 'states'];
+
+    if (sortField && locationSortFields.includes(sortField)) {
+        if (sortField === 'cities') {
+            const expr = sql`MIN(${locations.city})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'states') {
+            const expr = sql`MIN(${locations.state})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        }
+    } else {
+        const col = providers[sortField as keyof typeof providers.$inferSelect];
+        query.orderBy(sortDir === 'asc' ? asc(col) : desc(col));
+    }
+
+    const results = await query.execute();
+    return {
+        data: results,
+        columns: effectiveColumns || Object.keys(defaultSelect),
+    };
 }
 
 export type ProviderPracticesSearchParams = {

@@ -1,85 +1,107 @@
-import { search as providersSearch, SearchParams } from './providers.js';
-import { search as practicesSearch } from './practices.js';
+import { exportData as providersExport } from './providers.js';
+import { exportData as practicesExport } from './practices.js';
 
-export interface ExportParams {
-    entity: 'providers' | 'practices';
-    filters: { [key: string]: string };
-    sort: { field: string; direction: 'asc' | 'desc' };
-    selectedIds?: string[];
+function generateCsv(headers: string[], data: Record<string, any>[]): string {
+    const rows = data.map(row =>
+        headers.map(h => {
+            const val = row[h];
+            return `"${val != null ? val.toString().replace(/"/g, '""') : ''}"`;
+        }).join(',')
+    );
+    return [headers.join(','), ...rows].join('\n');
 }
 
-export const exportFunc = async ({
-    entity,
-    filters = {},
-    sort = { field: 'lastName', direction: 'asc' },
-    selectedIds
-}: ExportParams) => {
+const providerDefaultMapping = [
+    { header: 'NPI', key: 'npi' },
+    { header: 'First Name', key: 'firstName' },
+    { header: 'Middle Name', key: 'middleName' },
+    { header: 'Last Name', key: 'lastName' },
+    { header: 'Direct Email', key: 'directEmail' },
+    { header: 'Specialization', key: 'specialization' },
+    { header: 'Sales Rep', key: 'salesRep' },
+    { header: 'Status', key: 'status' },
+    { header: 'Action', key: 'action' },
+    { header: 'Follow Up Date', key: 'followUpDate' },
+    { header: 'Follow Up Reason', key: 'followUpReason' },
+];
+
+const practiceDefaultMapping = [
+    { header: 'NPI', key: 'npi' },
+    { header: 'Name', key: 'name' },
+    { header: 'Specialization', key: 'specialization' },
+    { header: 'Status', key: 'status' },
+    { header: 'Action', key: 'action' },
+    { header: 'Follow Up Date', key: 'followUpDate' },
+    { header: 'Follow Up Reason', key: 'followUpReason' },
+    { header: 'EHR System', key: 'ehrSystem' },
+    { header: 'PM System', key: 'pmSystem' },
+];
+
+export const exportFunc = async (params: Record<string, any>) => {
+    const { entity, columns: rawColumns, ...rest } = params;
+
+    const columns: string[] | undefined = rawColumns
+        ? (Array.isArray(rawColumns) ? rawColumns : [rawColumns])
+        : undefined;
+
     switch (entity) {
-        case 'providers':
-            // Implement provider export logic here
-            console.log('Exporting providers with filters:', filters, 'sort:', sort, 'selectedIds:', selectedIds);
-            // extract filters into format seach function expects
-            const searchParams: any = {
-                ...Object.keys(filters).map(key => ({ [key]: filters[key] })),
-                sortField: sort.field,
-                sortDir: sort.direction,
-                providerIds: Array.isArray(selectedIds) ? selectedIds : [selectedIds],
-                pageSize: -1
+        case 'providers': {
+            const selectedIds = params['selectedIds[]'];
+            const providerIds = selectedIds
+                ? (Array.isArray(selectedIds) ? selectedIds.map(Number) : [Number(selectedIds)])
+                : undefined;
+
+            const { data: records, columns: resolvedColumns } = await providersExport({
+                ...rest,
+                providerIds,
+                columns
+            } as any);
+
+            if (columns && columns.length > 0) {
+                const csv = generateCsv(resolvedColumns, records);
+                return csv;
             }
-            const records = await providersSearch(searchParams);
 
-            const output = [
-                ['NPI', 'First Name', 'Middle Name', 'Last Name', 'Direct Email', 'Specialization', 'Sales Rep', 'Status', 'Action', 'Follow Up Date', 'Follow Up Reason'],
-                ...records.data.map(rec => ([
-                    rec.npi,
-                    rec.firstName,
-                    rec.middleName,
-                    rec.lastName,
-                    rec.directEmail,
-                    rec.specialization,
-                    rec.salesRep,
-                    rec.status,
-                    rec.action,
-                    rec.followUpDate,
-                    rec.followUpReason
-                ]))
-            ];
-
-            const csv = output.map(row => row.map(item => `"${item ? item.toString().replace(/"/g, '""') : ''}"`).join(',')).join('\n');
-
+            const rows = records.map((rec: any) => {
+                const row: Record<string, any> = {};
+                for (const { header, key } of providerDefaultMapping) {
+                    row[header] = rec[key];
+                }
+                return row;
+            });
+            const headers = providerDefaultMapping.map(m => m.header);
+            const csv = generateCsv(headers, rows);
             return csv;
-        case 'practices':
-            // Implement practice export logic here
-            console.log('Exporting practices with filters:', filters, 'sort:', sort, 'selectedIds:', selectedIds);
-            // extract filters into format seach function expects
-            const practiceSearchParams: any = {
-                ...Object.keys(filters).map(key => ({ [key]: filters[key] })),
-                sortField: sort.field,
-                sortDir: sort.direction,
-                practiceIds: Array.isArray(selectedIds) ? selectedIds : [selectedIds],
-                pageSize: -1
+        }
+        case 'practices': {
+            const selectedIds = params['selectedIds[]'];
+            const practiceIds = selectedIds
+                ? (Array.isArray(selectedIds) ? selectedIds : [selectedIds])
+                : undefined;
+
+            const { data: records, columns: resolvedColumns } = await practicesExport({
+                ...rest,
+                practiceIds,
+                columns
+            } as any);
+
+            if (columns && columns.length > 0) {
+                const csv = generateCsv(resolvedColumns, records);
+                return csv;
             }
-            const practiceRecords = await practicesSearch(practiceSearchParams);
 
-            const practiceOutput = [
-                ['NPI', 'Name', 'Specialization', 'Status', 'Action', 'Follow Up Date', 'Follow Up Reason', 'EHR System', 'PM System'],
-                ...practiceRecords.data.map(rec => ([
-                    rec.npi,
-                    rec.name,
-                    rec.specialization,
-                    rec.status,
-                    rec.action,
-                    rec.followUpDate,
-                    rec.followUpReason,
-                    rec.ehrSystem,
-                    rec.pmSystem
-                ]))
-            ];
-
-            const practiceCsv = practiceOutput.map(row => row.map(item => `"${item ? item.toString().replace(/"/g, '""') : ''}"`).join(',')).join('\n');
-
-            return practiceCsv;
+            const rows = records.map((rec: any) => {
+                const row: Record<string, any> = {};
+                for (const { header, key } of practiceDefaultMapping) {
+                    row[header] = rec[key];
+                }
+                return row;
+            });
+            const headers = practiceDefaultMapping.map(m => m.header);
+            const csv = generateCsv(headers, rows);
+            return csv;
+        }
         default:
             throw new Error('Unknown entity type for export');
     }
-}
+};

@@ -1,15 +1,19 @@
 {
   "compilerOptions": {
+    "types": [
+      "node"
+    ],
     "composite": true,
     "declaration": true,
     "target": "ES2020",
-    "module": "ESNext",
+    "module": "NodeNext",
     "rootDir": "src",
     "outDir": "dist",
     "strict": true,
     "esModuleInterop": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "NodeNext",
     "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "baseUrl": "./src"

@@ -9,7 +9,7 @@
     "dev": "tsx watch src/server.ts",
     "start": "node dist/server.js",
     "lint": "eslint .",
-    "test": "jest"
+    "test": "cross-env NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "keywords": [],
   "author": "Cole McMannus",
@@ -37,6 +37,7 @@
     "drizzle-kit": "^0.31.5",
     "jest": "^30.0.5",
     "nodemon": "^3.1.10",
+    "ts-jest": "^29.4.9",
     "ts-node": "^10.9.2"
   }
 }
