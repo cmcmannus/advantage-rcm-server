@@ -98,23 +98,16 @@ router.get('/filter-options', async (req, res, next) => {
 
 router.get('/export', async (req, res, next) => {
     try {
-        // Export logic would go here
         const entity = req.query.entity as 'practices' | 'providers';
-        const selectedIds: string[] = req.query['selectedIds[]'] as string[] || [];
-        const sortDir = req.query['sort[direction]'] || 'asc';
-        const sortField = req.query['sort[field]'] || (entity === 'providers' ? 'lastName' : 'name');
 
         const csv = await exportFunc({
             entity,
-            selectedIds,
-            sort: {
-                field: sortField as string,
-                direction: sortDir as 'asc' | 'desc'
-            },
-            filters: {}
+            ...req.query as unknown as any,
+            selectedIds: req.query['selectedIds[]'] as string[],
+            columns: req.query.columns as string[] | undefined
         });
         res.header('Content-Type', 'text/csv');
-        res.attachment('practices.csv');
+        res.attachment(`${entity}.csv`);
         res.send(csv);
     } catch (err) {
         next(err);

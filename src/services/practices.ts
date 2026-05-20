@@ -1,8 +1,8 @@
 import { initDb } from "../db/client.js";
 import { practices, practiceLocations, locations, providerPracticeLocations, providers, statuses, actions, followUpReasons, ehrSystems, pmSystems, userFavorites } from "../db/schema.js";
 import { eq, InferInsertModel, InferSelectModel, like, inArray, lt, BinaryOperator, gt, asc, desc, sql, count, and, notExists, notInArray, SQL, or } from 'drizzle-orm';
-import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 import { SearchResponseModel } from "./providers.js";
+import { MySqlColumn } from "drizzle-orm/mysql-core";
 
 const db = initDb();
 
@@ -297,6 +297,195 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
     };
 
     return resp;
+}
+
+const locationTriggerColumn = 'locations';
+
+function expandColumns(columns: string[], isProvider: boolean): string[] {
+    const hasLocation = columns.some(c => c === locationTriggerColumn);
+    if (!hasLocation) return columns;
+
+    const expanded = columns.filter(c => c !== locationTriggerColumn);
+    expanded.push('address1', 'address2', 'city', 'state', 'zip');
+    if (isProvider) expanded.push('practiceName');
+    return expanded;
+}
+
+export const practiceColumnMap: Record<string, any> = {
+    id: practices.id,
+    npi: practices.npi,
+    name: practices.name,
+    specialization: practices.specialization,
+    statusId: practices.statusId,
+    actionId: practices.actionId,
+    followUpDate: practices.followUpDate,
+    followUpReasonId: practices.followUpReasonId,
+    ehrSystemId: practices.ehrSystemId,
+    pmSystemId: practices.pmSystemId,
+    status: statuses.status,
+    action: actions.action,
+    followUpReason: followUpReasons.reason,
+    ehrSystem: ehrSystems.systemName,
+    pmSystem: pmSystems.systemName,
+    address1: sql`group_concat(distinct ${locations.address1} SEPARATOR '|')`,
+    address2: sql`group_concat(distinct ${locations.address2} SEPARATOR '|')`,
+    city: sql`group_concat(distinct ${locations.city} SEPARATOR '|')`,
+    state: sql`group_concat(distinct ${locations.state} SEPARATOR '|')`,
+    zip: sql`group_concat(distinct ${locations.zip} SEPARATOR '|')`,
+};
+
+export type ExportParams = Omit<SearchParams, 'pageSize' | 'pageNumber'> & {
+    columns?: string[];
+};
+
+export async function exportData(params: ExportParams): Promise<{ data: Record<string, any>[]; columns: string[] }> {
+    const {
+        npi,
+        name,
+        specialization,
+        status,
+        action,
+        followUpDate,
+        followUpOperator,
+        followUpReason,
+        ehrSystem,
+        pmSystem,
+        cities,
+        states,
+        practiceIds,
+        sortField = 'name',
+        sortDir = 'asc',
+        columns,
+    } = params;
+
+    const defaultSelect = {
+        id: practices.id,
+        npi: practices.npi,
+        name: practices.name,
+        specialization: practices.specialization,
+        status: statuses.status,
+        action: actions.action,
+        followUpDate: practices.followUpDate,
+        followUpReason: followUpReasons.reason,
+        ehrSystem: ehrSystems.systemName,
+        pmSystem: pmSystems.systemName,
+    };
+
+    const effectiveColumns = columns && columns.length > 0
+        ? expandColumns(columns, false)
+        : undefined;
+
+    const selectColumns = effectiveColumns
+        ? Object.fromEntries(
+            effectiveColumns.filter(col => col in practiceColumnMap).map(col => [col, practiceColumnMap[col]])
+          )
+        : defaultSelect;
+
+    const query = db.selectDistinct(selectColumns)
+        .from(practices)
+        .leftJoin(statuses, eq(practices.statusId, statuses.id))
+        .leftJoin(actions, eq(practices.actionId, actions.id))
+        .leftJoin(followUpReasons, eq(practices.followUpReasonId, followUpReasons.id))
+        .leftJoin(ehrSystems, eq(practices.ehrSystemId, ehrSystems.id))
+        .leftJoin(pmSystems, eq(practices.pmSystemId, pmSystems.id))
+        .leftJoin(practiceLocations, eq(practiceLocations.practiceId, practices.id))
+        .leftJoin(locations, eq(practiceLocations.locationId, locations.id))
+        .$dynamic();
+
+    if (params.favoritesOnly && params.favoritesOnly === 'true' && params.userId) {
+        query.innerJoin(userFavorites, and(
+            eq(userFavorites.userId, params.userId!),
+            eq(userFavorites.practiceId, practices.id)
+        ));
+    }
+
+    const whereConditions = [];
+
+    if (npi) whereConditions.push(like(practices.npi, `%${npi}%`));
+    if (name) whereConditions.push(like(practices.name, `%${name}%`));
+    if (cities || states) {
+        const locConditions = [];
+        if (cities) locConditions.push(...cities.split(',').map(c => like(locations.city, `%${c.trim()}%`)));
+        if (states) locConditions.push(...states.split(',').map(s => like(locations.state, `%${s.trim()}%`)));
+        whereConditions.push(or(...locConditions));
+    }
+
+    const statusIds = status
+        ? status.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const actionIds = action
+        ? action.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const followUpReasonIds = followUpReason
+        ? followUpReason.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const ehrSystemIds = ehrSystem
+        ? ehrSystem.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const pmSystemIds = pmSystem
+        ? pmSystem.split(',').map(Number).filter(n => !isNaN(n))
+        : [];
+    const specializations = specialization ? specialization.split(',').map(s => s.trim()) : [];
+
+    if (statusIds.length > 0) whereConditions.push(inArray(practices.statusId, statusIds));
+    if (actionIds.length > 0) whereConditions.push(inArray(practices.actionId, actionIds));
+    if (followUpReasonIds.length > 0) whereConditions.push(inArray(practices.followUpReasonId, followUpReasonIds));
+    if (ehrSystemIds.length > 0) whereConditions.push(inArray(practices.ehrSystemId, ehrSystemIds));
+    if (pmSystemIds.length > 0) whereConditions.push(inArray(practices.pmSystemId, pmSystemIds));
+    if (practiceIds) whereConditions.push(inArray(practices.id, practiceIds.map(id => Number(id))));
+    if (specializations.length > 0) whereConditions.push(or(...specializations.map(s => eq(practices.specialization, s))));
+
+    if (followUpDate && followUpOperator && followUpDate instanceof Date) {
+        let operator: BinaryOperator = eq;
+        switch (followUpOperator) {
+            case 'lt':
+                operator = lt;
+                break;
+            case 'eq':
+                operator = eq;
+                break;
+            case 'gt':
+                operator = gt;
+                break;
+        }
+        whereConditions.push(operator(practices.followUpDate, followUpDate))
+    } else if (followUpDate && typeof followUpDate === 'string') {
+        const parts = followUpDate.split(':');
+        const mode = parts[0];
+        if (mode === 'after') {
+            whereConditions.push(gt(practices.followUpDate, new Date(parts[1])));
+        } else if (mode === 'before') {
+            whereConditions.push(lt(practices.followUpDate, new Date(parts[1])));
+        } else if (mode === 'between') {
+            const dates = parts[1].split(',');
+            if (dates[0]) whereConditions.push(gt(practices.followUpDate, new Date(dates[0])));
+            if (dates[1]) whereConditions.push(lt(practices.followUpDate, new Date(dates[1])));
+        }
+    }
+
+    query.where(and(...whereConditions));
+    query.groupBy(practices.id);
+
+    const locationSortFields = ['locations', 'cities', 'states'];
+
+    if (sortField && locationSortFields.includes(sortField)) {
+        if (sortField === 'cities') {
+            const expr = sql`MIN(${locations.city})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        } else if (sortField === 'states') {
+            const expr = sql`MIN(${locations.state})`;
+            query.orderBy(sortDir === 'asc' ? asc(expr) : desc(expr));
+        }
+    } else {
+        const col = practices[sortField as keyof typeof practices.$inferSelect];
+        query.orderBy(sortDir === 'asc' ? asc(col) : desc(col));
+    }
+
+    const results = await query.execute();
+    return {
+        data: results,
+        columns: effectiveColumns || Object.keys(defaultSelect),
+    };
 }
 
 export async function getPracticesForDdl(query?: string): Promise<{ value: number; label: string }[]> {
