@@ -38,7 +38,7 @@ const practiceDefaultMapping = [
 ];
 
 export const exportFunc = async (params: Record<string, any>) => {
-    const { entity, columns: rawColumns, ...rest } = params;
+    const { entity, "columns[]": rawColumns, "sort[direction]": sortDirection, "sort[field]": sortField, "selectedIds[]": selectedIds } = params;
 
     const columns: string[] | undefined = rawColumns
         ? (Array.isArray(rawColumns) ? rawColumns : [rawColumns])
@@ -46,13 +46,12 @@ export const exportFunc = async (params: Record<string, any>) => {
 
     switch (entity) {
         case 'providers': {
-            const selectedIds = params['selectedIds[]'];
             const providerIds = selectedIds
                 ? (Array.isArray(selectedIds) ? selectedIds.map(Number) : [Number(selectedIds)])
                 : undefined;
 
             const { data: records, columns: resolvedColumns } = await providersExport({
-                ...rest,
+                sort: sortField && sortDirection ? { field: sortField, direction: sortDirection } : undefined,
                 providerIds,
                 columns
             } as any);
@@ -74,13 +73,12 @@ export const exportFunc = async (params: Record<string, any>) => {
             return csv;
         }
         case 'practices': {
-            const selectedIds = params['selectedIds[]'];
             const practiceIds = selectedIds
                 ? (Array.isArray(selectedIds) ? selectedIds : [selectedIds])
                 : undefined;
 
             const { data: records, columns: resolvedColumns } = await practicesExport({
-                ...rest,
+                sort: sortField && sortDirection ? { field: sortField, direction: sortDirection } : undefined,
                 practiceIds,
                 columns
             } as any);
