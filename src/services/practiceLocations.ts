@@ -1,7 +1,7 @@
 import { practiceLocations, locations, providerPracticeLocations, practices } from "../db/schema.js";
 import { sql, eq, like, and, asc, desc, count, inArray, notInArray } from "drizzle-orm";
-import { MySqlColumn } from "drizzle-orm/mysql-core/index.js";
 import { initDb } from "../db/client.js";
+import { MySqlColumn } from "drizzle-orm/mysql-core";
 
 const db = initDb();
 
