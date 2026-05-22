@@ -79,13 +79,13 @@ tar -czf "$TARBALL" \
 
 echo "=== Uploading release ($(du -h "$TARBALL" | cut -f1)) ==="
 
-scp -i "$SSH_KEY" -P "$SSH_PORT" "$TARBALL" "$SSH_TARGET:$TARBALL"
+scp -i "$SSH_KEY" -P "$SSH_PORT" -o StrictHostKeyChecking=accept-new "$TARBALL" "$SSH_TARGET:$TARBALL"
 
 # --- Deploy ---
 
 echo "=== Deploying on server ==="
 
-ssh -i "$SSH_KEY" -p "$SSH_PORT" "$SSH_TARGET" << DEPLOY_SCRIPT
+ssh -i "$SSH_KEY" -p "$SSH_PORT" -o StrictHostKeyChecking=accept-new "$SSH_TARGET" << DEPLOY_SCRIPT
 set -euo pipefail
 
 mkdir -p "$RELEASE_DIR"
