@@ -35,9 +35,6 @@ jobs:
           printf "%s" "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
           chmod 700 ~/.ssh
-          sed -n '1,5p' ~/.ssh/id_ed25519
-          echo "---"
-          sed -n '$-5,$p' ~/.ssh/id_ed25519
           ssh-keyscan -H ${{ secrets.EC2_SERVER }} >> ~/.ssh/known_hosts
 
       - name: Deploy
