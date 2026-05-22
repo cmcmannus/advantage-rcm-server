@@ -327,11 +327,11 @@ export const practiceColumnMap: Record<string, any> = {
     followUpReason: followUpReasons.reason,
     ehrSystem: ehrSystems.systemName,
     pmSystem: pmSystems.systemName,
-    address1: sql`group_concat(distinct ${locations.address1} SEPARATOR '|')`,
-    address2: sql`group_concat(distinct ${locations.address2} SEPARATOR '|')`,
-    city: sql`group_concat(distinct ${locations.city} SEPARATOR '|')`,
-    state: sql`group_concat(distinct ${locations.state} SEPARATOR '|')`,
-    zip: sql`group_concat(distinct ${locations.zip} SEPARATOR '|')`,
+    address1: locations.address1,
+    address2: locations.address2,
+    city: locations.city,
+    state: locations.state,
+    zip: locations.zip,
 };
 
 export type ExportParams = Omit<SearchParams, 'pageSize' | 'pageNumber'> & {
@@ -381,7 +381,7 @@ export async function exportData(params: ExportParams): Promise<{ data: Record<s
           )
         : defaultSelect;
 
-    const query = db.selectDistinct(selectColumns)
+    const query = db.select(selectColumns)
         .from(practices)
         .leftJoin(statuses, eq(practices.statusId, statuses.id))
         .leftJoin(actions, eq(practices.actionId, actions.id))
@@ -464,7 +464,6 @@ export async function exportData(params: ExportParams): Promise<{ data: Record<s
     }
 
     query.where(and(...whereConditions));
-    query.groupBy(practices.id);
 
     const locationSortFields = ['locations', 'cities', 'states'];
 

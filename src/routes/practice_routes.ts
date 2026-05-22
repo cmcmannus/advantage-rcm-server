@@ -102,9 +102,9 @@ router.get('/export', async (req, res, next) => {
 
         const csv = await exportFunc({
             entity,
-            ...req.query as unknown as any,
-            selectedIds: req.query['selectedIds[]'] as string[],
-            columns: req.query.columns as string[] | undefined
+            columns: req.query['columns[]'] as string[] | undefined,
+            selectedIds: req.query['selectedIds[]'] as string[] | undefined,
+            sort: req.query.sort as { field: string; direction: string } | undefined,
         });
         res.header('Content-Type', 'text/csv');
         res.attachment(`${entity}.csv`);

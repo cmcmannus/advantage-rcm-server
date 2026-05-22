@@ -38,20 +38,24 @@ const practiceDefaultMapping = [
 ];
 
 export const exportFunc = async (params: Record<string, any>) => {
-    const { entity, "columns[]": rawColumns, "sort[direction]": sortDirection, "sort[field]": sortField, "selectedIds[]": selectedIds } = params;
+    const { entity, columns: rawColumns, sort: rawSort, selectedIds: rawSelectedIds } = params;
 
     const columns: string[] | undefined = rawColumns
         ? (Array.isArray(rawColumns) ? rawColumns : [rawColumns])
         : undefined;
 
+    const sort = rawSort && typeof rawSort === 'object' && 'field' in rawSort
+        ? { field: String(rawSort.field), direction: String(rawSort.direction) }
+        : undefined;
+
     switch (entity) {
         case 'providers': {
-            const providerIds = selectedIds
-                ? (Array.isArray(selectedIds) ? selectedIds.map(Number) : [Number(selectedIds)])
+            const providerIds = rawSelectedIds
+                ? (Array.isArray(rawSelectedIds) ? rawSelectedIds.map(Number) : [Number(rawSelectedIds)])
                 : undefined;
 
             const { data: records, columns: resolvedColumns } = await providersExport({
-                sort: sortField && sortDirection ? { field: sortField, direction: sortDirection } : undefined,
+                sort,
                 providerIds,
                 columns
             } as any);
@@ -73,12 +77,12 @@ export const exportFunc = async (params: Record<string, any>) => {
             return csv;
         }
         case 'practices': {
-            const practiceIds = selectedIds
-                ? (Array.isArray(selectedIds) ? selectedIds : [selectedIds])
+            const practiceIds = rawSelectedIds
+                ? (Array.isArray(rawSelectedIds) ? rawSelectedIds : [rawSelectedIds])
                 : undefined;
 
             const { data: records, columns: resolvedColumns } = await practicesExport({
-                sort: sortField && sortDirection ? { field: sortField, direction: sortDirection } : undefined,
+                sort,
                 practiceIds,
                 columns
             } as any);
