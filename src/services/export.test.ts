@@ -57,7 +57,7 @@ describe('exportFunc', () => {
         it('passes selectedIds as providerIds', async () => {
             mockProvidersExport.mockResolvedValue({ data: [], columns: ['npi'] });
 
-            await exportFunc({ entity: 'providers', 'selectedIds[]': ['1', '2'] });
+            await exportFunc({ entity: 'providers', selectedIds: ['1', '2'] });
 
             expect(mockProvidersExport).toHaveBeenCalledWith(
                 expect.objectContaining({ providerIds: [1, 2] })
@@ -110,7 +110,7 @@ describe('exportFunc', () => {
         it('passes selectedIds as practiceIds', async () => {
             mockPracticesExport.mockResolvedValue({ data: [], columns: ['npi'] });
 
-            await exportFunc({ entity: 'practices', 'selectedIds[]': ['10', '20'] });
+            await exportFunc({ entity: 'practices', selectedIds: ['10', '20'] });
 
             expect(mockPracticesExport).toHaveBeenCalledWith(
                 expect.objectContaining({ practiceIds: ['10', '20'] })

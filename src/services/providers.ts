@@ -71,7 +71,7 @@ export type SearchParams = {
     middleName: string;
     lastName: string;
     directEmail: string;
-    specializations?: string;
+    specialization?: string;
     status?: string;
     action?: string;
     followUpReason?: string;
@@ -115,7 +115,7 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
         middleName,
         lastName,
         directEmail,
-        specializations: pSpecializations,
+        specialization: pSpecializations,
         salesRep: pSalesReps,
         status: pStatuses,
         action: pActions,
@@ -339,12 +339,12 @@ export const providerColumnMap: Record<string, any> = {
     action: actions.action,
     followUpReason: followUpReasons.reason,
     salesRep: sql`CONCAT(${users.firstName}, ' ', ${users.lastName})`,
-    address1: sql`group_concat(distinct ${locations.address1} SEPARATOR '|')`,
-    address2: sql`group_concat(distinct ${locations.address2} SEPARATOR '|')`,
-    city: sql`group_concat(distinct ${locations.city} SEPARATOR '|')`,
-    state: sql`group_concat(distinct ${locations.state} SEPARATOR '|')`,
-    zip: sql`group_concat(distinct ${locations.zip} SEPARATOR '|')`,
-    practiceName: sql`group_concat(distinct ${practices.name} SEPARATOR '|')`,
+    address1: locations.address1,
+    address2: locations.address2,
+    city: locations.city,
+    state: locations.state,
+    zip: locations.zip,
+    practiceName: practices.name,
 };
 
 function expandColumns(columns: string[], isProvider: boolean): string[] {
@@ -368,7 +368,7 @@ export async function exportData(params: ExportParams): Promise<{ data: Record<s
         middleName,
         lastName,
         directEmail,
-        specializations: pSpecializations,
+        specialization: pSpecializations,
         salesRep: pSalesReps,
         status: pStatuses,
         action: pActions,
@@ -409,7 +409,7 @@ export async function exportData(params: ExportParams): Promise<{ data: Record<s
           )
         : defaultSelect;
 
-    const query = db.selectDistinct(selectColumns)
+    const query = db.select(selectColumns)
         .from(providers)
         .leftJoin(users, eq(users.id, providers.salesRepId))
         .leftJoin(statuses, eq(statuses.id, providers.statusId))
@@ -493,7 +493,6 @@ export async function exportData(params: ExportParams): Promise<{ data: Record<s
     if (adminName) whereConditions.push(like(providers.adminName, `%${adminName}%`));
 
     query.where(and(...whereConditions));
-    query.groupBy(providers.id);
 
     const locationSortFields = ['locations', 'cities', 'states'];
 
