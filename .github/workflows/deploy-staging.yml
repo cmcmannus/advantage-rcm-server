@@ -35,5 +35,5 @@ jobs:
             # Install deps & build server
             npm install
             npm run build
-            pm2 reload advrcm-server --watch
+            pm2 reload server --watch
           EOF
