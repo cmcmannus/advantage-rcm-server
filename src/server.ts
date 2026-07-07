@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
 
 import { authenticateToken } from './middleware/auth.js';
 
@@ -19,23 +20,19 @@ import statuses from './routes/status_routes.js';
 import users from './routes/user_routes.js';
 import initConfig from './utils/config.js';
 
-async function run() {
-  initConfig();
-
-  const app = express();
-  const SERVER_PORT = process.env.PORT || 3000;
+export function createApp() {
   const APP_BASE_URL = (process.env.APP_BASE_URL || `http://localhost:5173`);
 
-  console.log('CORS allowed origin:', APP_BASE_URL);
+  const app = express();
 
   app.use(express.json());
 
   const corsOptions = {
     origin: APP_BASE_URL,
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE',
-    allowedHeaders: ['Content-Type', 'Authorization'], // Allow Authorization header
+    allowedHeaders: ['Content-Type', 'Authorization'],
     credentials: true,
-    optionsSuccessStatus: 204 // For preflight requests
+    optionsSuccessStatus: 204
   }
 
   app.use(cors(corsOptions));
@@ -56,12 +53,24 @@ async function run() {
   app.use('/api/statuses/', statuses);
   app.use('/api/users/', users);
 
+  return app;
+}
+
+async function run() {
+  initConfig();
+
+  const app = createApp();
+  const SERVER_PORT = process.env.PORT || 3000;
+
   app.listen(Number(SERVER_PORT), '0.0.0.0', () => {
     console.log(`🚀 Backend running at http://localhost:${SERVER_PORT}`);
   });
 };
 
-run().catch((err) => {
-  console.error('Error starting server:', err);
-  process.exit(1);
-});
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  run().catch((err) => {
+    console.error('Error starting server:', err);
+    process.exit(1);
+  });
+}
