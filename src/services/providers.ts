@@ -203,9 +203,9 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
             ? pSalesReps.split(',').map(Number).filter(n => !isNaN(n))
             : [];
     
-        if (statusIds.length > 0) whereConditions.push(inArray(practices.statusId, statusIds));
-        if (actionIds.length > 0) whereConditions.push(inArray(practices.actionId, actionIds));
-        if (followUpReasonIds.length > 0) whereConditions.push(inArray(practices.followUpReasonId, followUpReasonIds));
+        if (statusIds.length > 0) whereConditions.push(inArray(providers.statusId, statusIds));
+        if (actionIds.length > 0) whereConditions.push(inArray(providers.actionId, actionIds));
+        if (followUpReasonIds.length > 0) whereConditions.push(inArray(providers.followUpReasonId, followUpReasonIds));
         if (specializations.length > 0) whereConditions.push(or(...specializations.map(s => eq(providers.specialization, s))));
         if (salesRepIds.length > 0) whereConditions.push(inArray(users.id, salesRepIds));
         // Dates
