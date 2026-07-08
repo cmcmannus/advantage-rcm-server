@@ -27,7 +27,7 @@ export function createCrudRoutes<T>(
 
     router.post("/", async (req, res) => {
         try {
-            if ((req as any).user.accessLevel !== 1) return res.status(401);
+            if ((req as any).user.accessLevel !== 1) return res.status(401).json({ message: 'Admin access required' });
             const item = await service.create(req.body.name);
             res.status(200).json(item);
         } catch (err) {
@@ -37,7 +37,7 @@ export function createCrudRoutes<T>(
 
     router.put("/:id", async (req, res) => {
         try {
-            if ((req as any).user.accessLevel !== 1) return res.status(401);
+            if ((req as any).user.accessLevel !== 1) return res.status(401).json({ message: 'Admin access required' });
             const item = await service.update(Number(req.params.id), req.body.name);
             res.json(item);
         } catch (err) {
@@ -47,7 +47,7 @@ export function createCrudRoutes<T>(
 
     router.delete("/:id", async (req, res) => {
         try {
-            if ((req as any).user.accessLevel !== 1) return res.status(401);
+            if ((req as any).user.accessLevel !== 1) return res.status(401).json({ message: 'Admin access required' });
             await service.delete(Number(req.params.id));
             res.send({ message: `${capitalizeFirstLetter(resourceName)} deleted successfully` });
         } catch (err) {

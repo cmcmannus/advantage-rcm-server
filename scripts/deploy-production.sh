@@ -96,16 +96,17 @@ rm -f "$DEPLOY_DIR/current"
 ln -s "$RELEASE_DIR" "$DEPLOY_DIR/current"
 
 if pm2 show "$APP_NAME" &>/dev/null 2>&1; then
-    pm2 delete "$APP_NAME" || true
+    pm2 reload "$APP_NAME" --update-env
+else
+    pm2 start "$DEPLOY_DIR/current/dist/server.js" \
+        --name "$APP_NAME" \
+        -i max \
+        --env production \
+        --log "$DEPLOY_DIR/logs/app.log" \
+        --error "$DEPLOY_DIR/logs/error.log" \
+        --merge-logs \
+        --time
 fi
-
-pm2 start "$DEPLOY_DIR/current/dist/server.js" \
-    --name "$APP_NAME" \
-    --env production \
-    --log "$DEPLOY_DIR/logs/app.log" \
-    --error "$DEPLOY_DIR/logs/error.log" \
-    --merge-logs \
-    --time
 
 pm2 save
 DEPLOY_SCRIPT
