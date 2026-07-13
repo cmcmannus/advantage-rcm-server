@@ -17,6 +17,7 @@ export type SearchParams = {
     salesRep?: number;
     accessLevel?: number;
     active?: number;
+    hidden?: number;
     sortColumn?: keyof typeof users.$inferSelect;
     sortDirection?: 'ASC' | 'DESC';
 }
@@ -71,6 +72,7 @@ export async function updateUser(payload: SelectModel): Promise<UserResponseMode
         lastName?: string;
         salesRep?: number;
         accessLevel?: number;
+        hidden?: number;
         updated?: Date;
     } = {};
 
@@ -79,6 +81,7 @@ export async function updateUser(payload: SelectModel): Promise<UserResponseMode
     if (payload.lastName) (update_data as any).lastName = payload.lastName;
     if (payload.salesRep !== undefined) (update_data as any).salesRep = payload.salesRep ? 1 : 0;
     if (payload.accessLevel !== undefined) (update_data as any).accessLevel = payload.accessLevel;
+    if (payload.hidden !== undefined) (update_data as any).hidden = payload.hidden ? 1 : 0;
     update_data.updated = new Date();
 
     await db.update(users).set(update_data).where(eq(users.id, payload.id));
@@ -125,7 +128,8 @@ export async function loginUser(data: {
         .where(
             and(
                 eq(users.email, data.email),
-                eq(users.active, 1)
+                eq(users.active, 1),
+                eq(users.hidden, 0)
             )
         )
     )?.[0];
@@ -157,6 +161,11 @@ export async function getUsers(params: SearchParams) {
 
     const dbUsers = db.select().from(users);
     const filters = [];
+    if (hidden !== null) {
+        filters.push(eq(users.hidden, hidden ? 1 : 0));
+    } else {
+        filters.push(eq(users.hidden, 0));
+    }
     if (email) filters.push(like(users.email, `%${email}%`));
     if (firstName) filters.push(like(users.firstName, `%${firstName}%`));
     if (lastName) filters.push(like(users.lastName, `%${lastName}%`));

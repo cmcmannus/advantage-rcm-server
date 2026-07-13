@@ -37,6 +37,10 @@ export function createApp() {
 
   app.use(cors(corsOptions));
 
+  app.get('/api/health', (_req, res) => {
+    res.json({ status: 'ok', service: 'advantage-rcm', uptime: process.uptime() });
+  });
+
   app.use('/api/auth/', auth_routes);
   app.use(authenticateToken);
 
