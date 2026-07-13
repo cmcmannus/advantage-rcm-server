@@ -222,18 +222,18 @@ export async function search(params: SearchParams): Promise<SearchResponseModel<
                     operator = gt;
                     break;
             }
-            whereConditions.push(operator(practices.followUpDate, followUpDate))
+            whereConditions.push(operator(providers.followUpDate, followUpDate))
         } else if (followUpDate && typeof followUpDate === 'string') {
             const parts = followUpDate.split(':');
             const mode = parts[0];
             if (mode === 'after') {
-                whereConditions.push(gt(practices.followUpDate, new Date(parts[1])));
+                whereConditions.push(gt(providers.followUpDate, new Date(parts[1])));
             } else if (mode === 'before') {
-                whereConditions.push(lt(practices.followUpDate, new Date(parts[1])));
+                whereConditions.push(lt(providers.followUpDate, new Date(parts[1])));
             } else if (mode === 'between') {
                 const dates = parts[1].split(',');
-                if (dates[0]) whereConditions.push(gt(practices.followUpDate, new Date(dates[0])));
-                if (dates[1]) whereConditions.push(lt(practices.followUpDate, new Date(dates[1])));
+                if (dates[0]) whereConditions.push(gt(providers.followUpDate, new Date(dates[0])));
+                if (dates[1]) whereConditions.push(lt(providers.followUpDate, new Date(dates[1])));
             }
         }
     if (cities || states) {

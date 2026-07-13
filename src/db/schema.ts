@@ -193,6 +193,7 @@ export const users = mysqlTable("users", {
 	salesRep: tinyint("sales_rep").default(0).notNull(),
 	accessLevel: tinyint("access_level", { unsigned: true }).default(2).notNull(),
 	active: tinyint().default(1).notNull(),
+	hidden: tinyint().default(0).notNull(),
 	created: datetime({ mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 	updated: datetime({ mode: 'date' }).default(sql`(CURRENT_TIMESTAMP)`).notNull(),
 },
